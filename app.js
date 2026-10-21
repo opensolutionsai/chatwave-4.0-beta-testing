@@ -1,6 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, updateProfile, GoogleAuthProvider, signInWithPopup, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, writeBatch, limit, Timestamp, increment, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
 const FB = initializeApp({
   apiKey: "AIzaSyB5LZyLk27DTdTn655mYWd1F3q2LkPs9_8",
   authDomain: "fir-chatwave-4-supa.firebaseapp.com",
@@ -12,6 +14,21 @@ const FB = initializeApp({
 const auth = getAuth(FB);
 // Enable IndexedDB persistence so re-opening a chat costs 0 Firestore reads (served from cache)
 const db = initializeFirestore(FB, { localCache: persistentLocalCache() });
+
+// ── SUPABASE CLIENT (HYBRID PRESENCE & REALTIME) ──
+const SUPABASE_URL = "https://cejtngzybawccjqlaabq.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_JRfPBYe9BFV5VWKno1km5A_kfwoXyDZ";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+  accessToken: async () => {
+    if (!auth.currentUser) return null;
+    return (await auth.currentUser.getIdToken(false)) ?? null;
+  }
+});
 
 
 
@@ -366,7 +383,7 @@ window.doRegister = async (e) => {
     await updateProfile(cred.user, { displayName: name });
     await sendEmailVerification(cred.user);
     await setDoc(doc(db, "users", cred.user.uid), {
-      uid: cred.user.uid, name, email, phone: phone || "", photoURL: "", statusMsg: "Hey! I'm using ChatWave Ultra", online: false, createdAt: serverTimestamp()
+      uid: cred.user.uid, name, email, phone: phone || "", photoURL: "", statusMsg: "Hey! I'm using ChatWave Ultra", createdAt: serverTimestamp()
     });
     await signOut(auth);
     document.getElementById("vfy-email").textContent = email;
@@ -384,7 +401,7 @@ window.doGoogle = async () => {
     const ref = doc(db, "users", u.uid);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
-      await setDoc(ref, { uid: u.uid, name: u.displayName || "User", email: u.email, phone: "", photoURL: u.photoURL || "", statusMsg: "Hey! I'm using ChatWave Ultra", online: true, createdAt: serverTimestamp() });
+      await setDoc(ref, { uid: u.uid, name: u.displayName || "User", email: u.email, phone: "", photoURL: u.photoURL || "", statusMsg: "Hey! I'm using ChatWave Ultra", createdAt: serverTimestamp() });
     }
   } catch (err) { showErr(friendlyErr(err)); }
 };
@@ -409,46 +426,94 @@ window.doResend = async () => {
   } catch { toast("Could not resend. Try again.", "err"); }
 };
 
-// ── AGGRESSIVE PRESENCE SYSTEM ──
+// ── SUPABASE PRESENCE SYSTEM (Zero Firestore Writes) ──
+let presenceChannel = null;
 let presenceTimer = null;
 
-const updateMyPresence = (isOnline) => {
+async function updateSupabasePresence(isOnline) {
   if (!currentUser) return;
-  if (isOnline) {
-    updateDoc(doc(db, "users", currentUser.uid), { online: true }).catch(()=>{});
-  } else {
-    updateDoc(doc(db, "users", currentUser.uid), { online: false, lastSeen: serverTimestamp() }).catch(()=>{});
+  try {
+    const nowIso = new Date().toISOString();
+    await supabase.from("user_presence").upsert({
+      user_id: currentUser.uid,
+      is_online: isOnline,
+      last_seen: nowIso,
+      updated_at: nowIso
+    });
+  } catch (err) {
+    console.warn("Supabase presence update error:", err);
   }
-};
+}
+
+function startSupabasePresence() {
+  if (!currentUser) return;
+  if (presenceChannel) {
+    presenceChannel.unsubscribe();
+    presenceChannel = null;
+  }
+
+  // Realtime Presence Room (WebSocket auto-disconnect on close/crash)
+  presenceChannel = supabase.channel("online-users", {
+    config: { presence: { key: currentUser.uid } }
+  });
+
+  presenceChannel
+    .on("presence", { event: "sync" }, () => {
+      if (currentPeer) {
+        syncPeerPresenceState(currentPeer.id);
+      }
+    })
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await presenceChannel.track({
+          online: true,
+          online_at: new Date().toISOString()
+        });
+        await updateSupabasePresence(true);
+      }
+    });
+}
+
+function stopSupabasePresence() {
+  if (presenceChannel) {
+    presenceChannel.untrack();
+    presenceChannel.unsubscribe();
+    presenceChannel = null;
+  }
+  updateSupabasePresence(false);
+}
 
 // 1. Detect tab switching and minimizing
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    // Add a slight delay going online to prevent spam if user rapidly clicks tabs
     if (presenceTimer) clearTimeout(presenceTimer);
-    // 👈 FIX: Change 1500 to 5000 to save write quotas if users rapidly switch tabs
-    presenceTimer = setTimeout(() => updateMyPresence(true), 5000);
+    presenceTimer = setTimeout(() => {
+      if (presenceChannel) {
+        presenceChannel.track({ online: true, online_at: new Date().toISOString() });
+      }
+      updateSupabasePresence(true);
+    }, 1500);
   } else {
-    // INSTANT offline write. No timeouts. Browsers will kill timeouts.
     if (presenceTimer) clearTimeout(presenceTimer);
-    updateMyPresence(false);
+    if (presenceChannel) {
+      presenceChannel.untrack();
+    }
+    updateSupabasePresence(false);
   }
 });
 
 // 2. Detect tab closing or navigating away (CRITICAL for mobile)
 window.addEventListener('pagehide', () => {
-  updateMyPresence(false);
+  updateSupabasePresence(false);
 });
 
 // 3. Catch window closing on some desktop browsers
 window.addEventListener('beforeunload', () => {
-  updateMyPresence(false);
+  updateSupabasePresence(false);
 });
 
 window.doLogout = async () => {
-  if (currentUser) {
-    await updateDoc(doc(db, "users", currentUser.uid), { online: false, lastSeen: serverTimestamp() }).catch(()=>{});
-  }
+  stopSupabasePresence();
   await signOut(auth);
 };
 
@@ -476,7 +541,6 @@ onAuthStateChanged(auth, async (user) => {
       email: user.email,
       phone: myUserData?.phone || "",
       photoURL: myUserData?.photoURL || user.photoURL || "",
-      online: true,
       createdAt: myUserData?.createdAt || serverTimestamp()
     };
 
@@ -488,8 +552,8 @@ onAuthStateChanged(auth, async (user) => {
 
     await setDoc(doc(db, "users", user.uid), profileUpdate, { merge: true });
     
-    // Set initial online status on login
-    await updateDoc(doc(db, "users", user.uid), { online: true });
+    // Connect to Supabase Presence (Realtime WebSocket)
+    startSupabasePresence();
     
     document.getElementById("splash-screen").classList.remove("active");
     document.getElementById("auth-screen").classList.remove("active");
@@ -516,6 +580,7 @@ onAuthStateChanged(auth, async (user) => {
       }
     });
   } else {
+    stopSupabasePresence();
     currentUser = null;
     document.getElementById("splash-screen").classList.remove("active");
     document.getElementById("auth-screen").classList.add("active");
@@ -897,6 +962,83 @@ window.startChat = async (peerId) => {
   }
 };
 
+// ── PEER PRESENCE VIA SUPABASE (Zero Firestore Reads) ──
+function renderPeerPresenceUI(isOnline, lastSeenIso) {
+  const st = document.getElementById("peer-status");
+  if (!st) return;
+  if (amIBlocked) {
+    st.textContent = "offline";
+    st.className = "peer-status";
+    return;
+  }
+  let lastSeenMs = 0;
+  if (lastSeenIso) {
+    lastSeenMs = new Date(lastSeenIso).getTime();
+  }
+  st.textContent = isOnline ? "online" : (lastSeenMs > 0 ? `last seen ${fmtTime(lastSeenMs)}` : "offline");
+  st.className = `peer-status${isOnline ? " online" : ""}`;
+}
+
+function syncPeerPresenceState(peerId) {
+  if (!peerId || amIBlocked) return;
+  const isLive = !!(presenceChannel?.presenceState()?.[peerId]);
+  if (isLive) {
+    renderPeerPresenceUI(true, null);
+  }
+}
+
+async function listenPeerSupabasePresence(peerId) {
+  if (unsubPeerPresence) {
+    unsubPeerPresence();
+    unsubPeerPresence = null;
+  }
+  if (amIBlocked) {
+    renderPeerPresenceUI(false, null);
+    return;
+  }
+
+  // 1. Check WebSocket live presence room immediately
+  const isLiveInRoom = !!(presenceChannel?.presenceState()?.[peerId]);
+
+  // 2. Query initial last_seen from Supabase user_presence table
+  try {
+    const { data } = await supabase
+      .from("user_presence")
+      .select("is_online, last_seen")
+      .eq("user_id", peerId)
+      .maybeSingle();
+
+    if (data) {
+      const online = isLiveInRoom || data.is_online === true;
+      renderPeerPresenceUI(online, data.last_seen);
+    } else {
+      renderPeerPresenceUI(isLiveInRoom, null);
+    }
+  } catch (e) {
+    renderPeerPresenceUI(isLiveInRoom, null);
+  }
+
+  // 3. Listen to realtime updates on user_presence table for this peer
+  const subChannel = supabase
+    .channel(`peer-presence-${peerId}`)
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "user_presence",
+      filter: `user_id=eq.${peerId}`
+    }, (payload) => {
+      if (payload.new) {
+        const isLive = !!(presenceChannel?.presenceState()?.[peerId]);
+        renderPeerPresenceUI(isLive || payload.new.is_online === true, payload.new.last_seen);
+      }
+    })
+    .subscribe();
+
+  unsubPeerPresence = () => {
+    subChannel.unsubscribe();
+  };
+}
+
 // ── CHAT ──
 window.openChat = async (convId, peerId, peer) => {
   // Guard: you (the current user) blocked this person — you cannot open their chat
@@ -932,28 +1074,23 @@ window.openChat = async (convId, peerId, peer) => {
   myClearedAt = convSnap.exists() ? (convSnap.data().cleared?.[currentUser.uid] || null) : null;
   
   if (!amIBlocked) {
-    if (unsubPeerPresence) { unsubPeerPresence(); unsubPeerPresence = null; }
-    unsubPeerPresence = onSnapshot(doc(db, "users", peerId), (snap) => {
+    listenPeerSupabasePresence(peerId);
+    const unsubPeerDoc = onSnapshot(doc(db, "users", peerId), (snap) => {
       const data = snap.data();
-      const st = document.getElementById("peer-status");
-      if (!st) return;
-      if (!data) { st.textContent = "offline"; st.className = "peer-status"; return; }
-      
-      const lastSeen = data.lastSeen?.toMillis?.() || 0;
-      const isOnline = data.online === true;
-      st.textContent = isOnline ? "online" : (lastSeen > 0 ? `last seen ${fmtTime(lastSeen)}` : "offline");
-      st.className = `peer-status${isOnline ? " online" : ""}`;
-      
-      // Update cache and UI if name or photoURL changed live
+      if (!data) return;
       usersCache.set(peerId, data);
       document.getElementById("peer-name").textContent = data.name || "Unknown";
       avatarEl(document.getElementById("peer-av"), data.name, data.photoURL);
     });
+    const origUnsub = unsubPeerPresence;
+    unsubPeerPresence = () => {
+      if (origUnsub) origUnsub();
+      unsubPeerDoc();
+    };
   } else {
     // Shadow-blocked: show forced offline
     if (unsubPeerPresence) { unsubPeerPresence(); unsubPeerPresence = null; }
-    const st = document.getElementById('peer-status');
-    if (st) { st.textContent = 'offline'; st.className = 'peer-status'; }
+    renderPeerPresenceUI(false, null);
   }
   listenMessages(convId);
   document.getElementById("sidebar").classList.add("slide-out");
