@@ -2,13 +2,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, updateProfile, GoogleAuthProvider, signInWithPopup, deleteUser } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, writeBatch, limit, Timestamp, increment, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FB = initializeApp({
-  apiKey: "AIzaSyA_EmMQZT4HRG_nXknH1r_2KqcgvU2FmtE",
-  authDomain: "chatwave-35-app.firebaseapp.com",
-  projectId: "chatwave-35-app",
-  storageBucket: "chatwave-35-app.firebasestorage.app",
-  messagingSenderId: "152283391751",
-  appId: "1:152283391751:web:9fbd9c8d02a7885aa507a2",
-  databaseURL: "https://chatwave-35-app-default-rtdb.firebaseio.com"
+  apiKey: "AIzaSyB5LZyLk27DTdTn655mYWd1F3q2LkPs9_8",
+  authDomain: "fir-chatwave-4-supa.firebaseapp.com",
+  projectId: "fir-chatwave-4-supa",
+  storageBucket: "fir-chatwave-4-supa.firebasestorage.app",
+  messagingSenderId: "1099317711681",
+  appId: "1:1099317711681:web:0c89f8fb2eb51bb47bc7c0"
 });
 const auth = getAuth(FB);
 // Enable IndexedDB persistence so re-opening a chat costs 0 Firestore reads (served from cache)
