@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_chat" name="shell-type"/>
+<title>Chatwave Web</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+      body { overscroll-behavior: none; }
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #31353f; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #464555; }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "error": "#ffb4ab",
+            "surface-container-high": "#262a34",
+            "primary": "#c3c0ff",
+            "on-primary-fixed": "#0f0069",
+            "surface-container": "#1c1f29",
+            "outline": "#918fa1",
+            "on-secondary-fixed-variant": "#004e5c",
+            "tertiary-fixed": "#6ffbbe",
+            "surface-tint": "#c3c0ff",
+            "on-tertiary-fixed-variant": "#005236",
+            "secondary-fixed": "#acedff",
+            "on-primary": "#1d00a5",
+            "on-primary-fixed-variant": "#3323cc",
+            "secondary": "#4cd7f6",
+            "surface-container-highest": "#31353f",
+            "on-surface": "#dfe2ef",
+            "on-secondary-container": "#00424e",
+            "on-tertiary-container": "#67f4b7",
+            "inverse-surface": "#dfe2ef",
+            "on-tertiary-fixed": "#002113",
+            "outline-variant": "#464555",
+            "on-primary-container": "#dad7ff",
+            "on-secondary-fixed": "#001f26",
+            "on-tertiary": "#003824",
+            "on-error": "#690005",
+            "error-container": "#93000a",
+            "inverse-on-surface": "#2c303a",
+            "surface-variant": "#31353f",
+            "primary-container": "#4f46e5",
+            "secondary-container": "#03b5d3",
+            "secondary-fixed-dim": "#4cd7f6",
+            "primary-fixed-dim": "#c3c0ff",
+            "background": "#0f131c",
+            "tertiary-container": "#006e4b",
+            "tertiary-fixed-dim": "#4edea3",
+            "surface": "#0f131c",
+            "surface-container-low": "#181b25",
+            "on-surface-variant": "#c7c4d8",
+            "on-error-container": "#ffdad6",
+            "primary-fixed": "#e2dfff",
+            "surface-bright": "#353943",
+            "tertiary": "#4edea3",
+            "surface-dim": "#0f131c",
+            "on-secondary": "#003640",
+            "inverse-primary": "#4d44e3",
+            "on-background": "#dfe2ef",
+            "surface-container-lowest": "#0a0e17"
+          },
+          fontFamily: {
+            "body": ["Inter", "sans-serif"],
+            "headline": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-background font-body text-on-surface antialiased h-screen w-screen overflow-hidden flex">
+<!-- ================= LEFT SIDEBAR (CHATS LIST) ================= -->
+<nav class="w-16 h-full bg-surface-container-low border-r border-outline-variant/30 flex flex-col items-center justify-between py-3.5 flex-shrink-0 z-30 select-none"><div class="flex flex-col items-center gap-2 w-full"><button class="relative w-10 h-10 rounded-xl bg-surface-container-high text-primary flex items-center justify-center transition-colors shadow-sm" title="Chats" type="button"><span class="material-symbols-outlined text-[22px]">chat</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary ring-2 ring-surface-container-low"></span></button><button class="relative w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Calls" type="button"><span class="material-symbols-outlined text-[22px]">call</span></button><button class="relative w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Status" type="button"><span class="material-symbols-outlined text-[22px]">motion_photos_on</span></button><button class="relative w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Channels &amp; Communities" type="button"><span class="material-symbols-outlined text-[22px]">groups</span></button></div><div class="flex flex-col items-center gap-2 w-full"><button class="w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Settings" type="button"><span class="material-symbols-outlined text-[22px]">settings</span></button><div class="relative pt-1 cursor-pointer group"><img alt="Alex Vance" class="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8TL9EqJz5Z86alHAloVZsbAJ0cSidRIpA4bpb7q_A1MA3myY30cfck-vhmBILMFIQ6LASnKcrZjc_2LxaicvhLfGh_cWz-R30975KbF1Nc664GP361qswXKG_KmeLX0pbEVvtGh5qJam3Tm_pGWgIPr99Sfv1iEiHt-0bKRndh-DLbfM3xMjnHDC67FttVib4hBAxJWQULmE480g5ZT50UGx-EuPJJxkTDwmuA8z4Quvn5MRsIqq_VQ"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-tertiary ring-2 ring-surface-container-low"></span></div></div></nav><aside class="w-full md:w-[420px] lg:w-[440px] flex-shrink-0 flex flex-col bg-surface-container-lowest border-r border-outline-variant/30 h-full z-20">
+<!-- Top Header: User Profile & Actions -->
+<header class="h-16 px-4 bg-surface-container-low flex items-center justify-between border-b border-outline-variant/20 flex-shrink-0">
+<div class="flex items-center gap-3 cursor-pointer group">
+<div class="relative">
+<img alt="Alex Vance" class="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8TL9EqJz5Z86alHAloVZsbAJ0cSidRIpA4bpb7q_A1MA3myY30cfck-vhmBILMFIQ6LASnKcrZjc_2LxaicvhLfGh_cWz-R30975KbF1Nc664GP361qswXKG_KmeLX0pbEVvtGh5qJam3Tm_pGWgIPr99Sfv1iEiHt-0bKRndh-DLbfM3xMjnHDC67FttVib4hBAxJWQULmE480g5ZT50UGx-EuPJJxkTDwmuA8z4Quvn5MRsIqq_VQ"/>
+<span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-tertiary ring-2 ring-surface-container-low"></span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline text-sm font-semibold text-on-surface leading-tight">Alex Vance</span>
+<span class="text-xs text-on-surface-variant font-normal">Available</span>
+</div>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Status &amp; Stories" type="button">
+<span class="material-symbols-outlined text-[20px]">motion_photos_on</span>
+</button>
+<button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high hover:text-on-surface transition-colors" title="New Chat" type="button">
+<span class="material-symbols-outlined text-[20px]">edit_square</span>
+</button>
+<button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Menu" type="button">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Search Bar & Filters -->
+<div class="p-3 bg-surface-container-lowest border-b border-outline-variant/15 flex flex-col gap-2.5 flex-shrink-0">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3.5 top-2.5 text-outline text-lg pointer-events-none">search</span>
+<input class="w-full h-10 pl-10 pr-4 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder-outline focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all border border-transparent focus:border-primary/40" placeholder="Search or start new chat" type="text"/>
+</div>
+<!-- Filter Pills -->
+<div class="flex items-center gap-2">
+<button class="px-3.5 py-1 rounded-full bg-primary-container text-on-primary-container text-xs font-medium tracking-wide transition-colors">
+          All
+        </button>
+<button class="px-3.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-bright text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors flex items-center gap-1.5">
+<span>Unread</span>
+<span class="w-4 h-4 rounded-full bg-secondary text-on-secondary text-[10px] font-bold flex items-center justify-center">2</span>
+</button>
+<button class="px-3.5 py-1 rounded-full bg-surface-container-high hover:bg-surface-bright text-on-surface-variant hover:text-on-surface text-xs font-medium transition-colors">
+          Groups
+        </button>
+</div>
+</div>
+<!-- Conversations List -->
+<div class="flex-1 overflow-y-auto divide-y divide-outline-variant/10">
+<!-- Chat 1: Active Selection (Sarah Lin) -->
+<div class="relative flex items-center gap-3 p-3.5 bg-surface-container cursor-pointer transition-colors border-l-4 border-primary">
+<div class="relative flex-shrink-0">
+<img class="w-12 h-12 rounded-full object-cover" data-alt="Cinematic professional headshot of Sarah Lin" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UD_2zanYfgAxGecztLKbOyYPkLJtHjRNJnq0MTiRmofpGG0XLhbLK7ECgStOTqhhZM_mNHL60b0peuxZcW4i_YbT-blgR2x5aPYwN_GLRAlMxMEz5gRrSNTK0a3H47F2ubrGz1gzzTlCY3Tr6jbUHSfI0agxq8L-BW8Gh0chSzZT6Rc-KE1kgqAvNhCcf78zFU2TPmliYn2ye98yRkVkX61k3douShKY27BNpS0YfQurFwJQJcpJ4g"/>
+<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-tertiary ring-2 ring-surface-container"></span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline text-sm font-semibold text-on-surface truncate">Sarah Lin</span>
+<span class="text-xs text-primary font-medium">10:24 AM</span>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-xs text-on-surface-variant truncate">Awesome, see you at 7! 😊</p>
+<span class="ml-2 w-5 h-5 rounded-full bg-secondary text-on-secondary text-[11px] font-bold flex items-center justify-center flex-shrink-0">1</span>
+</div>
+</div>
+</div>
+<!-- Chat 2: Weekend Football (Group) -->
+<div class="flex items-center gap-3 p-3.5 hover:bg-surface-container-low cursor-pointer transition-colors">
+<div class="relative flex-shrink-0">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-secondary text-lg font-bold">
+            ⚽
+          </div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline text-sm font-semibold text-on-surface truncate">Weekend Football ⚽</span>
+<span class="text-xs text-outline">09:45 AM</span>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-xs text-outline truncate"><span class="text-on-surface-variant font-medium">David:</span> Who’s bringing the spare ball?</p>
+<span class="ml-2 w-5 h-5 rounded-full bg-secondary text-on-secondary text-[11px] font-bold flex items-center justify-center flex-shrink-0">3</span>
+</div>
+</div>
+</div>
+<!-- Chat 3: Marcus Sterling (1:1) -->
+<div class="flex items-center gap-3 p-3.5 hover:bg-surface-container-low cursor-pointer transition-colors">
+<div class="relative flex-shrink-0">
+<img class="w-12 h-12 rounded-full object-cover" data-alt="Marcus Sterling portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCt0we0qhJLMoWhlGHk9eDDVJRu4gg8GA5nyvZal6JnnVSlb3pZtHBqlrAkdAII8pJgnFGFwec72xe9fNzkZHJKVbOwzKUnyRm0v8npBPf-rfIIPWt9jK6PITUm_Z9ifLezQMV_VMPKzeuda9ovBRJDs50t7hUOAOFO_fLaAZddLI6xwTuRYv-Ie0wUscEM7iybrPzgHFfazIc14l7s8E6WkvknwSGaWKqdpsv1Bf2bnrCeL25MtU4zJA"/>
+<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-tertiary ring-2 ring-surface-container-lowest"></span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline text-sm font-semibold text-on-surface truncate">Marcus Sterling</span>
+<span class="text-xs text-outline">Yesterday</span>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-xs text-outline truncate flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-primary">done_all</span>
+              Just sent over the vacation photos!
+            </p>
+</div>
+</div>
+</div>
+<!-- Chat 4: Family Vacation (Group) -->
+<div class="flex items-center gap-3 p-3.5 hover:bg-surface-container-low cursor-pointer transition-colors">
+<div class="relative flex-shrink-0">
+<div class="w-12 h-12 rounded-full bg-primary-container/40 flex items-center justify-center text-primary text-lg">
+            🏖️
+          </div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline text-sm font-semibold text-on-surface truncate">Family Vacation 🌴</span>
+<span class="text-xs text-outline">Yesterday</span>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-xs text-outline truncate"><span class="text-on-surface-variant font-medium">Mom:</span> Flight details are confirmed! Can't wait</p>
+</div>
+</div>
+</div>
+<!-- Chat 5: Elena Petrova (1:1) -->
+<div class="flex items-center gap-3 p-3.5 hover:bg-surface-container-low cursor-pointer transition-colors">
+<div class="relative flex-shrink-0">
+<img class="w-12 h-12 rounded-full object-cover" data-alt="Elena Petrova portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUUm2vJpNzmzQPM4VMOC3alOuvzut6yZPXp4RlFhEx_uJadymVlm4mVCwuz9Pkxc0onL65sutVKwutgx-GDl6lMMH0qdDZtaAec9lCXnPFqn_ZHeiEx2YY9G5osPMPx6MpFvmtSZ88k25MwZgcB7L3rkKBp8m-DQJecigTiPbCUO2de1l0IGO8yZuowstDYKio8T4Ivg37JvvWIuWsNNFNdsLNAQh1t2z4OlcvSAzH8Du8wKaImdmbNQ"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline text-sm font-semibold text-on-surface truncate">Elena Petrova</span>
+<span class="text-xs text-outline">Tuesday</span>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-xs text-outline truncate flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">done</span>
+              Thanks for the coffee recommendation!
+            </p>
+</div>
+</div>
+</div>
+<!-- Chat 6: Mom (1:1) -->
+<div class="flex items-center gap-3 p-3.5 hover:bg-surface-container-low cursor-pointer transition-colors">
+<div class="relative flex-shrink-0">
+<div class="w-12 h-12 rounded-full bg-secondary/20 text-secondary flex items-center justify-center font-headline font-semibold text-base">
+            M
+          </div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between mb-1">
+<span class="font-headline text-sm font-semibold text-on-surface truncate">Mom ❤️</span>
+<span class="text-xs text-outline">Monday</span>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-xs text-outline truncate flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-primary">done_all</span>
+              Call me whenever you're free this weekend
+            </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Status / Encryption note -->
+<div class="px-4 py-2.5 bg-surface-container-low border-t border-outline-variant/15 flex items-center justify-center gap-1.5 text-outline text-xs">
+<span class="material-symbols-outlined text-sm text-tertiary">lock</span>
+<span>End-to-end encrypted</span>
+</div>
+</aside>
+<!-- ================= RIGHT / MAIN CHAT AREA ================= -->
+<main class="flex-1 flex flex-col h-full bg-surface relative overflow-hidden">
+<!-- Active Chat Header -->
+<header class="h-16 px-5 bg-surface-container-low border-b border-outline-variant/20 flex items-center justify-between flex-shrink-0 z-10">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="relative flex-shrink-0">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Sarah Lin portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UD_2zanYfgAxGecztLKbOyYPkLJtHjRNJnq0MTiRmofpGG0XLhbLK7ECgStOTqhhZM_mNHL60b0peuxZcW4i_YbT-blgR2x5aPYwN_GLRAlMxMEz5gRrSNTK0a3H47F2ubrGz1gzzTlCY3Tr6jbUHSfI0agxq8L-BW8Gh0chSzZT6Rc-KE1kgqAvNhCcf78zFU2TPmliYn2ye98yRkVkX61k3douShKY27BNpS0YfQurFwJQJcpJ4g"/>
+<span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-tertiary ring-2 ring-surface-container-low"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<h2 class="font-headline text-base font-semibold text-on-surface leading-tight truncate">Sarah Lin</h2>
+<span class="text-xs text-tertiary font-medium">online</span>
+</div>
+</div>
+<!-- Action Buttons: Audio Call, Video Call, Search, Options -->
+<div class="flex items-center gap-1 text-on-surface-variant">
+<button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container hover:text-on-surface transition-colors" title="Voice Call" type="button">
+<span class="material-symbols-outlined text-[20px]">call</span>
+</button>
+<button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container hover:text-on-surface transition-colors" title="Video Call" type="button">
+<span class="material-symbols-outlined text-[20px]">videocam</span>
+</button>
+<div class="w-px h-5 bg-outline-variant/30 mx-1"></div>
+<button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container hover:text-on-surface transition-colors" title="Search in chat" type="button">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</button>
+<button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container hover:text-on-surface transition-colors" title="Chat info and options" type="button">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</header>
+<!-- Message Canvas (Scrollable Feed) -->
+<div class="flex-1 overflow-y-auto px-4 md:px-12 lg:px-20 py-6 flex flex-col gap-4 bg-[radial-gradient(#1c1f29_1px,transparent_1px)] [background-size:24px_24px]">
+<!-- Date Badge -->
+<div class="flex justify-center my-2">
+<span class="px-3.5 py-1 rounded-full bg-surface-container-high/80 backdrop-blur-sm text-on-surface-variant text-xs font-medium uppercase tracking-wider shadow-sm">
+          Today
+        </span>
+</div>
+<!-- Incoming Message 1 (Sarah) -->
+<div class="flex items-end gap-2.5 max-w-[75%] md:max-w-[65%] self-start">
+<img alt="Sarah" class="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UD_2zanYfgAxGecztLKbOyYPkLJtHjRNJnq0MTiRmofpGG0XLhbLK7ECgStOTqhhZM_mNHL60b0peuxZcW4i_YbT-blgR2x5aPYwN_GLRAlMxMEz5gRrSNTK0a3H47F2ubrGz1gzzTlCY3Tr6jbUHSfI0agxq8L-BW8Gh0chSzZT6Rc-KE1kgqAvNhCcf78zFU2TPmliYn2ye98yRkVkX61k3douShKY27BNpS0YfQurFwJQJcpJ4g"/>
+<div class="flex flex-col">
+<div class="p-3.5 rounded-2xl rounded-bl-sm bg-surface-container text-on-surface shadow-sm leading-relaxed text-sm">
+            Hey Alex! Are we still on for dinner tonight at Osteria? 🍝
+          </div>
+<span class="text-[11px] text-outline mt-1 ml-1">10:14 AM</span>
+</div>
+</div>
+<!-- Outgoing Message 1 (Alex) -->
+<div class="flex flex-col items-end max-w-[75%] md:max-w-[65%] self-end">
+<div class="p-3.5 rounded-2xl rounded-br-sm bg-primary-container text-on-primary-container shadow-sm leading-relaxed text-sm">
+          Yes absolutely! Just checked reviews, their truffle pasta looks incredible. Are we meeting around 7?
+        </div>
+<div class="flex items-center gap-1 mt-1 mr-1">
+<span class="text-[11px] text-outline">10:18 AM</span>
+<span class="material-symbols-outlined text-sm text-secondary">done_all</span>
+</div>
+</div>
+<!-- Incoming Message 2 (Sarah - Image / Photo card) -->
+<div class="flex items-end gap-2.5 max-w-[75%] md:max-w-[65%] self-start">
+<img alt="Sarah" class="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UD_2zanYfgAxGecztLKbOyYPkLJtHjRNJnq0MTiRmofpGG0XLhbLK7ECgStOTqhhZM_mNHL60b0peuxZcW4i_YbT-blgR2x5aPYwN_GLRAlMxMEz5gRrSNTK0a3H47F2ubrGz1gzzTlCY3Tr6jbUHSfI0agxq8L-BW8Gh0chSzZT6Rc-KE1kgqAvNhCcf78zFU2TPmliYn2ye98yRkVkX61k3douShKY27BNpS0YfQurFwJQJcpJ4g"/>
+<div class="flex flex-col">
+<div class="p-1.5 rounded-2xl rounded-bl-sm bg-surface-container text-on-surface shadow-sm text-sm overflow-hidden">
+<div class="w-64 sm:w-72 h-44 rounded-xl bg-surface-container-high flex flex-col items-center justify-center relative overflow-hidden border border-outline-variant/30 group cursor-pointer">
+<div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent z-10"></div>
+<img alt="Restaurant Interior" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGiNGIqre1Rt8HJyjU-KnpS_TRFzRG-jRWE8lz-v2XrOYO8FpEYphIKPa1n3teYczZffkvC6Jnr9KJANEWNYZqCBO_LHtTw6QpGpBcKcoLtxTaiClAPytRnC-BRxfjz723Ge1lLvq8rqlKo-9Swx_ecO_-xYuFiDxl_NnfGvRfh10IgkFKu7TUMEvRBd3uDa-Nmf7OERdxHdhunuK_CfHUikxCSSd0Ci2-GEdzzKTMAgpOpHbqCyvAVw"/>
+<span class="absolute bottom-2.5 left-3 z-20 text-xs font-medium text-white flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">restaurant</span> Osteria Veronese table booked
+              </span>
+</div>
+<p class="px-2 pt-2.5 pb-1 text-on-surface">I already reserved a nice outdoor table by the terrace!</p>
+</div>
+<span class="text-[11px] text-outline mt-1 ml-1">10:20 AM</span>
+</div>
+</div>
+<!-- Outgoing Message 2 (Voice Note) -->
+<div class="flex flex-col items-end max-w-[75%] md:max-w-[65%] self-end">
+<div class="p-3 rounded-2xl rounded-br-sm bg-primary-container text-on-primary-container shadow-sm flex items-center gap-3 w-64 sm:w-72">
+<button class="w-10 h-10 rounded-full bg-surface-container-lowest text-primary flex items-center justify-center flex-shrink-0 hover:scale-105 transition-transform" type="button">
+<span class="material-symbols-outlined text-xl">play_arrow</span>
+</button>
+<div class="flex-1 flex flex-col gap-1">
+<div class="flex items-center gap-1 h-6">
+<span class="w-1 h-3 bg-on-primary-container/60 rounded-full"></span>
+<span class="w-1 h-5 bg-on-primary-container rounded-full"></span>
+<span class="w-1 h-2 bg-on-primary-container/70 rounded-full"></span>
+<span class="w-1 h-6 bg-on-primary-container rounded-full"></span>
+<span class="w-1 h-4 bg-on-primary-container/80 rounded-full"></span>
+<span class="w-1 h-7 bg-on-primary-container rounded-full"></span>
+<span class="w-1 h-3 bg-on-primary-container/60 rounded-full"></span>
+<span class="w-1 h-5 bg-on-primary-container rounded-full"></span>
+<span class="w-1 h-2 bg-on-primary-container/50 rounded-full"></span>
+<span class="w-1 h-4 bg-on-primary-container/70 rounded-full"></span>
+</div>
+<div class="flex justify-between text-[11px] text-on-primary-container/80 font-mono">
+<span>0:14</span>
+<span>Voice message</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1 mt-1 mr-1">
+<span class="text-[11px] text-outline">10:22 AM</span>
+<span class="material-symbols-outlined text-sm text-secondary">done_all</span>
+</div>
+</div>
+<!-- Outgoing Message 3 (Alex) -->
+<div class="flex flex-col items-end max-w-[75%] md:max-w-[65%] self-end">
+<div class="p-3.5 rounded-2xl rounded-br-sm bg-primary-container text-on-primary-container shadow-sm leading-relaxed text-sm">
+          That sounds perfect! Just grabbed the movie tickets for afterwards too 🍿
+        </div>
+<div class="flex items-center gap-1 mt-1 mr-1">
+<span class="text-[11px] text-outline">10:23 AM</span>
+<span class="material-symbols-outlined text-sm text-secondary">done_all</span>
+</div>
+</div>
+<!-- Incoming Message 3 (Sarah) -->
+<div class="flex items-end gap-2.5 max-w-[75%] md:max-w-[65%] self-start">
+<img alt="Sarah" class="w-7 h-7 rounded-full object-cover flex-shrink-0 mb-1" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-UD_2zanYfgAxGecztLKbOyYPkLJtHjRNJnq0MTiRmofpGG0XLhbLK7ECgStOTqhhZM_mNHL60b0peuxZcW4i_YbT-blgR2x5aPYwN_GLRAlMxMEz5gRrSNTK0a3H47F2ubrGz1gzzTlCY3Tr6jbUHSfI0agxq8L-BW8Gh0chSzZT6Rc-KE1kgqAvNhCcf78zFU2TPmliYn2ye98yRkVkX61k3douShKY27BNpS0YfQurFwJQJcpJ4g"/>
+<div class="flex flex-col">
+<div class="p-3.5 rounded-2xl rounded-bl-sm bg-surface-container text-on-surface shadow-sm leading-relaxed text-sm">
+            Awesome, see you at 7! 😊
+          </div>
+<span class="text-[11px] text-outline mt-1 ml-1">10:24 AM</span>
+</div>
+</div>
+</div>
+<!-- Consumer Chat Input Bar -->
+<div class="p-3 md:px-6 md:py-3.5 bg-surface-container-low border-t border-outline-variant/20 flex-shrink-0">
+<div class="flex items-center gap-2">
+<!-- Emoji Button -->
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors flex-shrink-0" title="Add Emoji" type="button">
+<span class="material-symbols-outlined text-2xl">sentiment_satisfied</span>
+</button>
+<!-- Media Attachment Button (Paperclip) -->
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors flex-shrink-0" title="Attach Photos, Videos or Files" type="button">
+<span class="material-symbols-outlined text-2xl">attach_file</span>
+</button>
+<!-- Main Text Input -->
+<div class="flex-1 relative">
+<input class="w-full h-11 px-4 rounded-xl bg-surface-container text-on-surface text-sm placeholder-outline focus:outline-none focus:ring-1 focus:ring-primary/60 border border-outline-variant/20 transition-all" placeholder="Type a message" type="text"/>
+</div>
+<!-- Voice Note Microphone Button -->
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-outline hover:text-secondary hover:bg-surface-container transition-colors flex-shrink-0" title="Hold to record voice message" type="button">
+<span class="material-symbols-outlined text-2xl">mic</span>
+</button>
+<!-- Send Button -->
+<button class="w-11 h-11 rounded-full bg-primary-container text-on-primary-container hover:bg-inverse-primary transition-all flex items-center justify-center flex-shrink-0 shadow-md hover:scale-105 active:scale-95" title="Send message" type="button">
+<span class="material-symbols-outlined text-xl">send</span>
+</button>
+</div>
+</div>
+</main>
+</body></html>

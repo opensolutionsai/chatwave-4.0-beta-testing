@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_chat" name="shell-type"/>
+<title>Chatwave Web</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    @layer base {
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+      body { overscroll-behavior: none; }
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #31353f; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #464555; }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "error": "#ffb4ab",
+            "surface-container-high": "#262a34",
+            "primary": "#c3c0ff",
+            "on-primary-fixed": "#0f0069",
+            "surface-container": "#1c1f29",
+            "outline": "#918fa1",
+            "on-secondary-fixed-variant": "#004e5c",
+            "tertiary-fixed": "#6ffbbe",
+            "surface-tint": "#c3c0ff",
+            "on-tertiary-fixed-variant": "#005236",
+            "secondary-fixed": "#acedff",
+            "on-primary": "#1d00a5",
+            "on-primary-fixed-variant": "#3323cc",
+            "secondary": "#4cd7f6",
+            "surface-container-highest": "#31353f",
+            "on-surface": "#dfe2ef",
+            "on-secondary-container": "#00424e",
+            "on-tertiary-container": "#67f4b7",
+            "inverse-surface": "#dfe2ef",
+            "on-tertiary-fixed": "#002113",
+            "outline-variant": "#464555",
+            "on-primary-container": "#dad7ff",
+            "on-secondary-fixed": "#001f26",
+            "on-tertiary": "#003824",
+            "on-error": "#690005",
+            "error-container": "#93000a",
+            "inverse-on-surface": "#2c303a",
+            "surface-variant": "#31353f",
+            "primary-container": "#4f46e5",
+            "secondary-container": "#03b5d3",
+            "secondary-fixed-dim": "#4cd7f6",
+            "primary-fixed-dim": "#c3c0ff",
+            "background": "#0f131c",
+            "tertiary-container": "#006e4b",
+            "tertiary-fixed-dim": "#4edea3",
+            "surface": "#0f131c",
+            "surface-container-low": "#181b25",
+            "on-surface-variant": "#c7c4d8",
+            "on-error-container": "#ffdad6",
+            "primary-fixed": "#e2dfff",
+            "surface-bright": "#353943",
+            "tertiary": "#4edea3",
+            "surface-dim": "#0f131c",
+            "on-secondary": "#003640",
+            "inverse-primary": "#4d44e3",
+            "on-background": "#dfe2ef",
+            "surface-container-lowest": "#0a0e17"
+          },
+          fontFamily: {
+            "body": ["Inter", "sans-serif"],
+            "headline": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-background font-body text-on-surface antialiased h-screen w-screen overflow-hidden flex">
+<!-- ================= LEFT SIDEBAR (CHATS LIST) ================= -->
+<nav class="w-16 h-full bg-surface-container-low border-r border-outline-variant/30 flex flex-col items-center justify-between py-3.5 flex-shrink-0 z-30 select-none"><div class="flex flex-col items-center gap-2 w-full"><button class="relative w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Chats" type="button"><span class="material-symbols-outlined text-[22px]">chat</span><span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary ring-2 ring-surface-container-low"></span></button><button class="relative w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Calls" type="button"><span class="material-symbols-outlined text-[22px]">call</span></button><button class="relative w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Status" type="button"><span class="material-symbols-outlined text-[22px]">motion_photos_on</span></button><button class="relative w-10 h-10 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center justify-center" title="Channels &amp; Communities" type="button"><span class="material-symbols-outlined text-[22px]">groups</span></button></div><div class="flex flex-col items-center gap-2 w-full"><button class="relative w-10 h-10 rounded-xl bg-surface-container-high text-primary flex items-center justify-center transition-colors shadow-sm" title="Settings" type="button"><span class="material-symbols-outlined text-[22px]">settings</span></button><div class="relative pt-1 cursor-pointer group"><img alt="Alex Vance" class="w-9 h-9 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8TL9EqJz5Z86alHAloVZsbAJ0cSidRIpA4bpb7q_A1MA3myY30cfck-vhmBILMFIQ6LASnKcrZjc_2LxaicvhLfGh_cWz-R30975KbF1Nc664GP361qswXKG_KmeLX0pbEVvtGh5qJam3Tm_pGWgIPr99Sfv1iEiHt-0bKRndh-DLbfM3xMjnHDC67FttVib4hBAxJWQULmE480g5ZT50UGx-EuPJJxkTDwmuA8z4Quvn5MRsIqq_VQ"/><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-tertiary ring-2 ring-surface-container-low"></span></div></div></nav><aside class="w-full md:w-[420px] lg:w-[440px] flex-shrink-0 flex flex-col bg-surface-container-lowest border-r border-outline-variant/30 h-full z-20"><header class="h-16 px-5 bg-surface-container-low flex items-center justify-between border-b border-outline-variant/20 flex-shrink-0"><div class="flex items-center gap-3"><h1 class="font-headline text-lg font-semibold text-on-surface leading-tight">Settings</h1></div><div class="flex items-center gap-1 text-on-surface-variant"><button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Close Settings" type="button"><span class="material-symbols-outlined text-[20px]">close</span></button></div></header><div class="p-3 bg-surface-container-lowest border-b border-outline-variant/15 flex flex-col flex-shrink-0"><div class="relative w-full"><span class="material-symbols-outlined absolute left-3.5 top-2.5 text-outline text-lg pointer-events-none">search</span><input class="w-full h-10 pl-10 pr-4 rounded-xl bg-surface-container-low text-on-surface text-sm placeholder-outline focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all border border-transparent focus:border-primary/40" placeholder="Search settings" type="text"/></div></div><div class="flex-1 overflow-y-auto divide-y divide-outline-variant/10 py-1"><div class="flex items-center gap-3.5 px-4 py-3 hover:bg-surface-container-low cursor-pointer transition-colors"><div class="relative flex-shrink-0"><img alt="Alex Vance" class="w-12 h-12 rounded-full object-cover ring-2 ring-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8TL9EqJz5Z86alHAloVZsbAJ0cSidRIpA4bpb7q_A1MA3myY30cfck-vhmBILMFIQ6LASnKcrZjc_2LxaicvhLfGh_cWz-R30975KbF1Nc664GP361qswXKG_KmeLX0pbEVvtGh5qJam3Tm_pGWgIPr99Sfv1iEiHt-0bKRndh-DLbfM3xMjnHDC67FttVib4hBAxJWQULmE480g5ZT50UGx-EuPJJxkTDwmuA8z4Quvn5MRsIqq_VQ"/><span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-tertiary ring-2 ring-surface-container-lowest"></span></div><div class="flex-1 min-w-0"><h3 class="font-headline text-sm font-semibold text-on-surface truncate">Alex Vance</h3><p class="text-xs text-on-surface-variant truncate">Available ⚡</p></div><span class="material-symbols-outlined text-outline text-lg">chevron_right</span></div><div class="py-1"><div class="flex items-center gap-3.5 px-4 py-3 hover:bg-surface-container-low cursor-pointer transition-colors"><span class="material-symbols-outlined text-on-surface-variant text-xl">manage_accounts</span><div class="flex-1 min-w-0"><span class="font-headline text-sm font-medium text-on-surface truncate block">Account</span><p class="text-xs text-outline truncate">Security notifications, change number, delete account</p></div></div><div class="flex items-center gap-3.5 px-4 py-3 bg-surface-container border-l-4 border-primary cursor-pointer transition-colors"><span class="material-symbols-outlined text-primary text-xl">lock</span><div class="flex-1 min-w-0"><span class="font-headline text-sm font-semibold text-on-surface truncate block">Privacy &amp; Security</span><p class="text-xs text-on-surface-variant truncate">Block contacts, disappearing messages, read receipts</p></div><span class="material-symbols-outlined text-primary text-lg">chevron_right</span></div><div class="flex items-center gap-3.5 px-4 py-3 hover:bg-surface-container-low cursor-pointer transition-colors"><span class="material-symbols-outlined text-on-surface-variant text-xl">chat</span><div class="flex-1 min-w-0"><span class="font-headline text-sm font-medium text-on-surface truncate block">Chats</span><p class="text-xs text-outline truncate">Theme, wallpaper, chat history, export</p></div></div><div class="flex items-center gap-3.5 px-4 py-3 hover:bg-surface-container-low cursor-pointer transition-colors"><span class="material-symbols-outlined text-on-surface-variant text-xl">notifications</span><div class="flex-1 min-w-0"><span class="font-headline text-sm font-medium text-on-surface truncate block">Notifications</span><p class="text-xs text-outline truncate">Message tones, call alerts, preview settings</p></div></div><div class="flex items-center gap-3.5 px-4 py-3 hover:bg-surface-container-low cursor-pointer transition-colors"><span class="material-symbols-outlined text-on-surface-variant text-xl">data_usage</span><div class="flex-1 min-w-0"><span class="font-headline text-sm font-medium text-on-surface truncate block">Storage &amp; Data</span><p class="text-xs text-outline truncate">Network usage, auto-download preferences</p></div></div><div class="flex items-center gap-3.5 px-4 py-3 hover:bg-surface-container-low cursor-pointer transition-colors"><span class="material-symbols-outlined text-on-surface-variant text-xl">help_outline</span><div class="flex-1 min-w-0"><span class="font-headline text-sm font-medium text-on-surface truncate block">Help &amp; Feedback</span><p class="text-xs text-outline truncate">FAQ, contact us, terms and privacy policy</p></div></div><div class="flex items-center gap-3.5 px-4 py-3 hover:bg-surface-container-low cursor-pointer transition-colors text-error"><span class="material-symbols-outlined text-xl">logout</span><div class="flex-1 min-w-0"><span class="font-headline text-sm font-medium text-error truncate block">Log out</span></div></div></div></div><div class="px-4 py-2.5 bg-surface-container-low border-t border-outline-variant/15 flex items-center justify-center gap-1.5 text-outline text-xs"><span class="material-symbols-outlined text-sm text-tertiary">lock</span><span>End-to-end encrypted</span></div></aside>
+<!-- ================= RIGHT / MAIN CHAT AREA ================= -->
+<main class="flex-1 flex flex-col h-full bg-surface relative overflow-hidden"><header class="h-16 px-6 bg-surface-container-low border-b border-outline-variant/20 flex items-center justify-between flex-shrink-0 z-10"><div class="flex items-center gap-3 min-w-0"><span class="material-symbols-outlined text-primary text-2xl">lock</span><div class="flex flex-col min-w-0"><h2 class="font-headline text-base font-semibold text-on-surface leading-tight truncate">Privacy &amp; Security</h2><span class="text-xs text-on-surface-variant font-normal">Manage who can see your info and chat safely</span></div></div><div class="flex items-center gap-1 text-on-surface-variant"><button class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container hover:text-on-surface transition-colors" title="Help with Privacy" type="button"><span class="material-symbols-outlined text-[20px]">info</span></button></div></header><div class="flex-1 overflow-y-auto px-4 md:px-12 lg:px-20 py-6 flex flex-col gap-6"><div class="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-low border border-outline-variant/20"><div class="relative flex-shrink-0"><img alt="Alex Vance" class="w-16 h-16 rounded-full object-cover ring-2 ring-primary/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8TL9EqJz5Z86alHAloVZsbAJ0cSidRIpA4bpb7q_A1MA3myY30cfck-vhmBILMFIQ6LASnKcrZjc_2LxaicvhLfGh_cWz-R30975KbF1Nc664GP361qswXKG_KmeLX0pbEVvtGh5qJam3Tm_pGWgIPr99Sfv1iEiHt-0bKRndh-DLbfM3xMjnHDC67FttVib4hBAxJWQULmE480g5ZT50UGx-EuPJJxkTDwmuA8z4Quvn5MRsIqq_VQ"/><span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-tertiary ring-2 ring-surface-container-low"></span></div><div class="flex-1 min-w-0"><div class="flex items-center gap-2"><h3 class="font-headline text-base font-semibold text-on-surface truncate">Alex Vance</h3><span class="px-2 py-0.5 rounded-full bg-secondary/20 text-secondary text-[11px] font-mono">+1 (555) 019-2834</span></div><p class="text-xs text-on-surface-variant mt-1">Status: Available ⚡</p></div><button class="px-3.5 py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-bright text-xs font-medium text-on-surface transition-colors flex items-center gap-1.5" type="button"><span class="material-symbols-outlined text-sm">edit</span> Edit Profile</button></div><div class="rounded-2xl bg-surface-container border border-outline-variant/20 overflow-hidden divide-y divide-outline-variant/10"><div class="p-4 flex items-center justify-between cursor-pointer hover:bg-surface-container-high transition-colors"><div class="flex flex-col pr-4"><span class="font-headline text-sm font-medium text-on-surface">Last seen &amp; online status</span><span class="text-xs text-outline mt-0.5">Everyone</span></div><span class="material-symbols-outlined text-outline text-lg">chevron_right</span></div><div class="p-4 flex items-center justify-between"><div class="flex flex-col pr-4"><span class="font-headline text-sm font-medium text-on-surface">Read receipts</span><span class="text-xs text-outline mt-0.5">If turned off, you won't send or receive Read receipts. Always sent in group chats.</span></div><button aria-checked="true" class="w-11 h-6 rounded-full bg-primary-container p-0.5 transition-colors flex items-center justify-end flex-shrink-0 cursor-pointer" role="switch" type="button"><span class="w-5 h-5 rounded-full bg-on-primary-container shadow-sm"></span></button></div><div class="p-4 flex items-center justify-between cursor-pointer hover:bg-surface-container-high transition-colors"><div class="flex flex-col pr-4"><span class="font-headline text-sm font-medium text-on-surface">Disappearing messages</span><span class="text-xs text-outline mt-0.5">Default timer: Off</span></div><span class="material-symbols-outlined text-outline text-lg">chevron_right</span></div><div class="p-4 flex items-center justify-between"><div class="flex flex-col pr-4"><span class="font-headline text-sm font-medium text-on-surface">Screen lock / Biometrics</span><span class="text-xs text-outline mt-0.5">Require passcode or fingerprint to unlock Chatwave Web</span></div><button aria-checked="false" class="w-11 h-6 rounded-full bg-surface-container-highest p-0.5 transition-colors flex items-center justify-start flex-shrink-0 cursor-pointer" role="switch" type="button"><span class="w-5 h-5 rounded-full bg-outline shadow-sm"></span></button></div></div><div class="rounded-2xl bg-surface-container border border-outline-variant/20 overflow-hidden"><div class="p-4 flex items-center justify-between border-b border-outline-variant/10"><div class="flex items-center gap-2.5"><span class="material-symbols-outlined text-error text-xl">block</span><div><span class="font-headline text-sm font-medium text-on-surface block">Blocked contacts</span><span class="text-xs text-outline">3 contacts currently blocked</span></div></div><button class="px-3 py-1 rounded-xl bg-surface-container-high hover:bg-surface-bright text-xs font-medium text-primary transition-colors" type="button">Manage</button></div><div class="p-4 flex flex-col gap-3"><div class="flex items-center justify-between text-xs"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-outline text-xs font-mono font-bold">+1</div><div class="flex flex-col"><span class="text-on-surface font-medium">+1 (555) 492-0193</span><span class="text-outline text-[11px]">Spam caller</span></div></div><button class="text-xs text-secondary hover:underline" type="button">Unblock</button></div><div class="flex items-center justify-between text-xs"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-outline text-xs font-mono font-bold">JD</div><div class="flex flex-col"><span class="text-on-surface font-medium">John Doe</span><span class="text-outline text-[11px]">Blocked Nov 14</span></div></div><button class="text-xs text-secondary hover:underline" type="button">Unblock</button></div></div></div><div class="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/20 flex items-start gap-3.5"><span class="material-symbols-outlined text-tertiary text-2xl flex-shrink-0 mt-0.5">verified_user</span><div class="flex flex-col gap-1"><span class="font-headline text-sm font-semibold text-on-surface">Your privacy is protected</span><p class="text-xs text-on-surface-variant leading-relaxed">Your personal messages and calls are end-to-end encrypted. No one outside of this chat, not even Chatwave, can read or listen to them.</p></div></div></div></main>
+</body></html>
