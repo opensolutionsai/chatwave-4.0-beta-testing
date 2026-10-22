@@ -451,12 +451,14 @@ window.doResend = async () => {
   } catch { toast("Could not resend. Try again.", "err"); }
 };
 
-// ── ROBUST REALTIME PRESENCE SYSTEM (Low Effort, Multi-Tab Safe) ──
+// ── ROBUST REALTIME PRESENCE SYSTEM (Multi-Tab Safe & Instant) ──
 let presenceChannel = null;
+let offlineTimer = null;
+let isSubscribing = false;
 const clientSessionId = Math.random().toString(36).substring(2, 9);
 
-function isUserActiveOnTab() {
-  return document.visibilityState === 'visible' && document.hasFocus();
+function isTabVisible() {
+  return document.visibilityState === 'visible';
 }
 
 async function reportPresenceDb(isOnline) {
@@ -485,7 +487,6 @@ function sendBeaconOffline() {
     updated_at: nowIso
   });
   
-  // fetch with keepalive: true survives page dismissals/unloads and supports headers
   try {
     fetch(url, {
       method: "POST",
@@ -499,7 +500,6 @@ function sendBeaconOffline() {
     }).catch(() => {});
   } catch {}
 
-  // sendBeacon survives page dismissals/swipes on mobile and desktop
   try {
     navigator.sendBeacon?.(
       url,
@@ -508,73 +508,139 @@ function sendBeaconOffline() {
   } catch {}
 }
 
-async function updateMyPresenceState() {
-  if (!presenceChannel || !currentUser) return;
-  const active = isUserActiveOnTab();
-  
-  await presenceChannel.track({
-    uid: currentUser.uid,
-    session: clientSessionId,
-    online: active,
-    updated_at: new Date().toISOString()
-  });
-  
-  await reportPresenceDb(active);
+async function trackOnline() {
+  if (!currentUser || !presenceChannel || presenceChannel.state !== 'joined') return;
+  try {
+    await presenceChannel.track({
+      uid: currentUser.uid,
+      session: clientSessionId,
+      online: true,
+      updated_at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.warn("Presence track warning:", err);
+  }
 }
 
 function startSupabasePresence() {
-  if (!currentUser) return;
+  if (!currentUser || isSubscribing) return;
+  isSubscribing = true;
+
   if (presenceChannel) {
-    presenceChannel.unsubscribe();
+    try { presenceChannel.unsubscribe(); } catch {}
     presenceChannel = null;
   }
 
-  // Realtime channel tracked by session ID to allow multiple tabs
   presenceChannel = supabase.channel("online-users", {
     config: { presence: { key: `${currentUser.uid}:${clientSessionId}` } }
   });
 
+  const onPresenceUpdate = () => {
+    if (currentPeer) {
+      syncPeerPresenceState(currentPeer.id);
+    }
+  };
+
   presenceChannel
-    .on("presence", { event: "sync" }, () => {
-      if (currentPeer) {
-        syncPeerPresenceState(currentPeer.id);
-      }
-    })
+    .on("presence", { event: "sync" }, onPresenceUpdate)
+    .on("presence", { event: "join" }, onPresenceUpdate)
+    .on("presence", { event: "leave" }, onPresenceUpdate)
     .subscribe(async (status) => {
+      isSubscribing = false;
       if (status === "SUBSCRIBED") {
-        await updateMyPresenceState();
+        if (isTabVisible()) {
+          await trackOnline();
+          await reportPresenceDb(true);
+        }
+        if (currentPeer) {
+          syncPeerPresenceState(currentPeer.id);
+        }
       }
     });
 }
 
 function stopSupabasePresence() {
   if (presenceChannel) {
-    presenceChannel.untrack();
-    presenceChannel.unsubscribe();
+    try {
+      presenceChannel.untrack();
+      presenceChannel.unsubscribe();
+    } catch {}
     presenceChannel = null;
   }
   reportPresenceDb(false);
 }
 
 // ── TAB & FOCUS LIFECYCLE HANDLERS ──
-const handleTabStateChange = () => {
-  if (currentUser && presenceChannel) {
-    updateMyPresenceState();
+function handleTabActive() {
+  if (!currentUser) return;
+  if (offlineTimer) {
+    clearTimeout(offlineTimer);
+    offlineTimer = null;
   }
-};
 
-window.addEventListener('visibilitychange', handleTabStateChange);
-window.addEventListener('focus', handleTabStateChange);
-window.addEventListener('blur', handleTabStateChange);
+  if (!presenceChannel || presenceChannel.state !== 'joined') {
+    startSupabasePresence();
+  } else {
+    trackOnline();
+    reportPresenceDb(true);
+  }
+
+  if (currentPeer) {
+    syncPeerPresenceState(currentPeer.id);
+  }
+}
+
+function handleTabInactive() {
+  if (!currentUser) return;
+  if (offlineTimer) clearTimeout(offlineTimer);
+
+  // 3-second grace period: prevents rapid flickering on quick tab switching
+  offlineTimer = setTimeout(async () => {
+    if (document.visibilityState === 'hidden') {
+      if (presenceChannel && presenceChannel.state === 'joined') {
+        try {
+          await presenceChannel.track({
+            uid: currentUser.uid,
+            session: clientSessionId,
+            online: false,
+            updated_at: new Date().toISOString()
+          });
+        } catch {}
+      }
+      await reportPresenceDb(false);
+    }
+  }, 3000);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    handleTabActive();
+  } else {
+    handleTabInactive();
+  }
+});
+
+window.addEventListener('pageshow', handleTabActive);
+window.addEventListener('focus', handleTabActive);
 
 window.addEventListener('pagehide', () => {
   sendBeaconOffline();
-  stopSupabasePresence();
 });
 
 window.addEventListener('beforeunload', () => {
   sendBeaconOffline();
 });
+
+// Periodic heartbeat (every 25s) to guarantee presence channel stays joined
+setInterval(() => {
+  if (currentUser && document.visibilityState === 'visible') {
+    if (!presenceChannel || presenceChannel.state !== 'joined') {
+      startSupabasePresence();
+    } else {
+      trackOnline();
+    }
+  }
+}, 25000);
 
 window.doLogout = async () => {
   stopSupabasePresence();
@@ -1029,13 +1095,18 @@ window.startChat = async (peerId) => {
 // ── PEER PRESENCE INSPECTOR ──
 function checkPeerIsLive(peerId) {
   if (!presenceChannel || !peerId) return false;
-  const state = presenceChannel.presenceState();
-  // Check all active presences across all tabs/sessions for this user
-  for (const key in state) {
-    const metas = state[key];
-    if (metas && metas.some(m => m.uid === peerId && m.online === true)) {
-      return true;
+  try {
+    const state = presenceChannel.presenceState();
+    for (const key in state) {
+      const metas = state[key];
+      if (metas && (key.startsWith(peerId) || metas.some(m => m.uid === peerId))) {
+        if (metas.some(m => m.online === true)) {
+          return true;
+        }
+      }
     }
+  } catch (e) {
+    console.warn("checkPeerIsLive error:", e);
   }
   return false;
 }
@@ -1087,36 +1158,18 @@ function syncPeerPresenceState(peerId) {
   }
 }
 
-async function listenPeerSupabasePresence(peerId) {
-  if (unsubPeerPresence) {
-    unsubPeerPresence();
-    unsubPeerPresence = null;
-  }
+function listenPeerSupabasePresence(peerId) {
   if (amIBlocked) {
     renderPeerPresenceUI(false, null);
-    return;
+    return () => {};
   }
 
-  // 1. Initial check against Realtime Channel
-  const isCurrentlyLive = checkPeerIsLive(peerId);
+  // 1. Instant check against Realtime Presence Room
+  syncPeerPresenceState(peerId);
 
-  // 2. Query initial fallback timestamp from user_presence DB
-  try {
-    const { data } = await supabase
-      .from("user_presence")
-      .select("is_online, last_seen")
-      .eq("user_id", peerId)
-      .maybeSingle();
-
-    const isOnline = isCurrentlyLive || (data?.is_online === true);
-    renderPeerPresenceUI(isOnline, data?.last_seen);
-  } catch (e) {
-    renderPeerPresenceUI(isCurrentlyLive, null);
-  }
-
-  // 3. Listen to realtime DB updates for last-seen transitions
+  // 2. Listen for Postgres changes on user_presence table for this peer
   const subChannel = supabase
-    .channel(`peer-presence-${peerId}`)
+    .channel(`peer-presence-${peerId}-${Date.now()}`)
     .on("postgres_changes", {
       event: "*",
       schema: "public",
@@ -1130,8 +1183,8 @@ async function listenPeerSupabasePresence(peerId) {
     })
     .subscribe();
 
-  unsubPeerPresence = () => {
-    subChannel.unsubscribe();
+  return () => {
+    try { subChannel.unsubscribe(); } catch {}
   };
 }
 
@@ -1174,7 +1227,11 @@ window.openChat = async (convId, peerId, peer) => {
   myClearedAt = convSnap.exists() ? (convSnap.data().cleared?.[currentUser.uid] || null) : null;
   
   if (!amIBlocked) {
-    listenPeerSupabasePresence(peerId);
+    if (unsubPeerPresence) {
+      unsubPeerPresence();
+      unsubPeerPresence = null;
+    }
+    const unsubPresence = listenPeerSupabasePresence(peerId);
     const unsubPeerDoc = onSnapshot(doc(db, "users", peerId), (snap) => {
       const data = snap.data();
       if (!data) return;
@@ -1187,9 +1244,8 @@ window.openChat = async (convId, peerId, peer) => {
         if (amIBlocked) renderPeerPresenceUI(false, null);
       }
     });
-    const origUnsub = unsubPeerPresence;
     unsubPeerPresence = () => {
-      if (origUnsub) origUnsub();
+      if (unsubPresence) unsubPresence();
       unsubPeerDoc();
     };
   } else {
