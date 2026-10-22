@@ -210,6 +210,27 @@ async function deriveSharedKey(peerPubKeyJwk) {
   );
 }
 
+function uint8ToBase64(bytes) {
+  let binary = "";
+  const len = bytes.byteLength;
+  const chunkSize = 8192;
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8(base64) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 async function encryptText(text, sharedKey) {
   if (!text || !sharedKey) return text;
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -219,13 +240,14 @@ async function encryptText(text, sharedKey) {
   const combined = new Uint8Array(iv.length + cipherBuffer.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(cipherBuffer), iv.length);
-  return btoa(String.fromCharCode(...combined));
+  return uint8ToBase64(combined);
 }
 
 async function decryptText(base64Cipher, sharedKey) {
   if (!base64Cipher || !sharedKey) return base64Cipher;
   try {
-    const combined = new Uint8Array(atob(base64Cipher).split("").map(c => c.charCodeAt(0)));
+    const combined = base64ToUint8(base64Cipher);
+    if (combined.length < 13) return base64Cipher;
     const iv = combined.slice(0, 12);
     const data = combined.slice(12);
     const decryptedBuffer = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, sharedKey, data);
@@ -308,6 +330,9 @@ document.addEventListener('visibilitychange', trySendReadReceipt);
 
 
 // ── HELPERS ──
+const esc = (str) => String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+window.esc = esc;
+
 window.toast = (msg, type = "info") => {
   const el = document.createElement("div");
   el.className = `toast ${type}`;
@@ -328,30 +353,12 @@ window.showErr = (msg) => {
   el.classList.remove("hidden");
   setTimeout(() => el.classList.add("hidden"), 5000);
 };
-const escapeHtml = (str) => {
-  if (!str) return "";
-  return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
-};
-
-window.openModal = (id) => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.classList.remove("hidden");
-  if (id === "new-chat-modal") {
-    const inp = document.getElementById("find-email");
-    const res = document.getElementById("find-result");
-    if (inp) {
-      inp.value = "";
-      setTimeout(() => inp.focus(), 100);
-    }
-    if (res) res.innerHTML = "";
-  }
-};
+window.openModal = (id) => document.getElementById(id).classList.remove("hidden");
 window.closeModal = (id) => document.getElementById(id).classList.add("hidden");
 window.maybeCloseModal = (e, id) => { if (e.target === e.currentTarget) closeModal(id); };
 
 const initials = (name) => name ? name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) : "?";
-const avatarEl = (el, name, url) => { el.innerHTML = url ? `<img src="${url}" />` : initials(name); };
+const avatarEl = (el, name, url) => { el.innerHTML = url ? `<img src="${esc(url)}" />` : esc(initials(name)); };
 const fmtTime = (ts) => { if (!ts) return ""; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const fmtDate = (ts) => { if (!ts) return ""; const d = ts.toDate ? ts.toDate() : new Date(ts); const now = new Date(); if (d.toDateString() === now.toDateString()) return "Today"; const y = new Date(now); y.setDate(y.getDate() - 1); if (d.toDateString() === y.toDateString()) return "Yesterday"; return d.toLocaleDateString([], { month: "short", day: "numeric" }); };
 
@@ -444,14 +451,18 @@ window.doResend = async () => {
   } catch { toast("Could not resend. Try again.", "err"); }
 };
 
-// ── SUPABASE PRESENCE SYSTEM (Zero Firestore Writes) ──
+// ── ROBUST REALTIME PRESENCE SYSTEM (Low Effort, Multi-Tab Safe) ──
 let presenceChannel = null;
-let presenceTimer = null;
+const clientSessionId = Math.random().toString(36).substring(2, 9);
 
-async function updateSupabasePresence(isOnline) {
+function isUserActiveOnTab() {
+  return document.visibilityState === 'visible' && document.hasFocus();
+}
+
+async function reportPresenceDb(isOnline) {
   if (!currentUser) return;
+  const nowIso = new Date().toISOString();
   try {
-    const nowIso = new Date().toISOString();
     await supabase.from("user_presence").upsert({
       user_id: currentUser.uid,
       is_online: isOnline,
@@ -459,8 +470,56 @@ async function updateSupabasePresence(isOnline) {
       updated_at: nowIso
     });
   } catch (err) {
-    console.warn("Supabase presence update error:", err);
+    console.warn("Presence DB update error:", err);
   }
+}
+
+function sendBeaconOffline() {
+  if (!currentUser) return;
+  const nowIso = new Date().toISOString();
+  const url = `${SUPABASE_URL}/rest/v1/user_presence?apikey=${SUPABASE_ANON_KEY}`;
+  const payload = JSON.stringify({
+    user_id: currentUser.uid,
+    is_online: false,
+    last_seen: nowIso,
+    updated_at: nowIso
+  });
+  
+  // fetch with keepalive: true survives page dismissals/unloads and supports headers
+  try {
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
+      },
+      body: payload,
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+
+  // sendBeacon survives page dismissals/swipes on mobile and desktop
+  try {
+    navigator.sendBeacon?.(
+      url,
+      new Blob([payload], { type: "application/json; charset=UTF-8" })
+    );
+  } catch {}
+}
+
+async function updateMyPresenceState() {
+  if (!presenceChannel || !currentUser) return;
+  const active = isUserActiveOnTab();
+  
+  await presenceChannel.track({
+    uid: currentUser.uid,
+    session: clientSessionId,
+    online: active,
+    updated_at: new Date().toISOString()
+  });
+  
+  await reportPresenceDb(active);
 }
 
 function startSupabasePresence() {
@@ -470,9 +529,9 @@ function startSupabasePresence() {
     presenceChannel = null;
   }
 
-  // Realtime Presence Room (WebSocket auto-disconnect on close/crash)
+  // Realtime channel tracked by session ID to allow multiple tabs
   presenceChannel = supabase.channel("online-users", {
-    config: { presence: { key: currentUser.uid } }
+    config: { presence: { key: `${currentUser.uid}:${clientSessionId}` } }
   });
 
   presenceChannel
@@ -483,11 +542,7 @@ function startSupabasePresence() {
     })
     .subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        await presenceChannel.track({
-          online: true,
-          online_at: new Date().toISOString()
-        });
-        await updateSupabasePresence(true);
+        await updateMyPresenceState();
       }
     });
 }
@@ -498,36 +553,27 @@ function stopSupabasePresence() {
     presenceChannel.unsubscribe();
     presenceChannel = null;
   }
-  updateSupabasePresence(false);
+  reportPresenceDb(false);
 }
 
-// 1. Detect tab switching and minimizing
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    if (presenceTimer) clearTimeout(presenceTimer);
-    presenceTimer = setTimeout(() => {
-      if (presenceChannel) {
-        presenceChannel.track({ online: true, online_at: new Date().toISOString() });
-      }
-      updateSupabasePresence(true);
-    }, 1500);
-  } else {
-    if (presenceTimer) clearTimeout(presenceTimer);
-    if (presenceChannel) {
-      presenceChannel.untrack();
-    }
-    updateSupabasePresence(false);
+// ── TAB & FOCUS LIFECYCLE HANDLERS ──
+const handleTabStateChange = () => {
+  if (currentUser && presenceChannel) {
+    updateMyPresenceState();
   }
-});
+};
 
-// 2. Detect tab closing or navigating away (CRITICAL for mobile)
+window.addEventListener('visibilitychange', handleTabStateChange);
+window.addEventListener('focus', handleTabStateChange);
+window.addEventListener('blur', handleTabStateChange);
+
 window.addEventListener('pagehide', () => {
-  updateSupabasePresence(false);
+  sendBeaconOffline();
+  stopSupabasePresence();
 });
 
-// 3. Catch window closing on some desktop browsers
 window.addEventListener('beforeunload', () => {
-  updateSupabasePresence(false);
+  sendBeaconOffline();
 });
 
 window.doLogout = async () => {
@@ -671,7 +717,7 @@ async function loadMyProfile() {
   const d = snap.data();
   document.getElementById("my-name").textContent = d.name || currentUser.displayName || "You";
   avatarEl(document.getElementById("my-av"), d.name, d.photoURL);
-  document.getElementById("pf-av").innerHTML = d.photoURL ? `<img src="${d.photoURL}"/>` : initials(d.name);
+  document.getElementById("pf-av").innerHTML = d.photoURL ? `<img src="${esc(d.photoURL)}"/>` : esc(initials(d.name));
   document.getElementById("pf-name").value = d.name || "";
   document.getElementById("pf-status").value = d.statusMsg || "";
   document.getElementById("pf-phone").value = d.phone || "";
@@ -733,7 +779,7 @@ window.uploadAv = async (e) => {
     await updateProfile(currentUser, { photoURL: secure_url });
 
     // 5. Update the UI instantly
-    document.getElementById("pf-av").innerHTML = `<img src="${secure_url}"/>`;
+    document.getElementById("pf-av").innerHTML = `<img src="${esc(secure_url)}"/>`;
     avatarEl(document.getElementById("my-av"), "", secure_url);
     
     toast("Profile photo updated successfully! ✓", "ok");
@@ -904,13 +950,13 @@ function renderConvItemSync(conv, peerId, peer, container) {
   const statusMsg = usersCache.get(peerId)?.statusMsg || "Available";
 
   item.innerHTML = `
-    <div class="av">${peer.photoURL ? `<img src="${peer.photoURL}"/>` : initials(peer.name)}</div>
+    <div class="av">${peer.photoURL ? `<img src="${esc(peer.photoURL)}"/>` : esc(initials(peer.name))}</div>
     <div class="conv-meta">
-      <div class="conv-name">${peer.name}</div>
-      <div class="conv-last">${statusMsg}</div> 
+      <div class="conv-name">${esc(peer.name)}</div>
+      <div class="conv-last">${esc(statusMsg)}</div> 
     </div>
     <div class="conv-right">
-      <span class="conv-time">${fmtTime(conv.lastAt)}</span>
+      <span class="conv-time">${esc(fmtTime(conv.lastAt))}</span>
       ${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ""}
     </div>`;
   container.appendChild(item);
@@ -928,91 +974,29 @@ let findTimer = null;
 window.findUser = (val) => {
   clearTimeout(findTimer);
   const res = document.getElementById("find-result");
-  if (!val || val.trim().length < 2) { res.innerHTML = ""; return; }
-  
+  if (!val || val.length < 3) { res.innerHTML = ""; return; }
   findTimer = setTimeout(async () => {
     res.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:8px 0">Searching…</div>`;
-    const searchVal = val.trim();
-    const searchLower = searchVal.toLowerCase();
-
-    try {
-      const usersRef = collection(db, "users");
-      const matchedMap = new Map();
-
-      // 1. Exact match by lowercase email
-      try {
-        const snapEmailLower = await getDocs(query(usersRef, where("email", "==", searchLower), limit(5)));
-        snapEmailLower.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
-      } catch (e) {
-        console.warn("Email lower query error:", e);
-      }
-
-      // 2. Exact match by typed email (if casing differed)
-      if (searchVal !== searchLower && matchedMap.size === 0) {
-        try {
-          const snapEmailExact = await getDocs(query(usersRef, where("email", "==", searchVal), limit(5)));
-          snapEmailExact.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
-        } catch (e) {}
-      }
-
-      // 3. Exact match by name
-      if (matchedMap.size === 0) {
-        try {
-          const snapName = await getDocs(query(usersRef, where("name", "==", searchVal), limit(5)));
-          snapName.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
-        } catch (e) {}
-      }
-
-      // 4. Prefix match by name (e.g. typing "Esw" finds "Eswar")
-      if (matchedMap.size === 0 && searchVal.length >= 2) {
-        try {
-          const snapNamePrefix = await getDocs(query(usersRef, where("name", ">=", searchVal), where("name", "<=", searchVal + "\uf8ff"), limit(5)));
-          snapNamePrefix.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
-        } catch (e) {}
-      }
-
-      // Check if user searched for themselves
-      if (matchedMap.size === 0) {
-        if (currentUser?.email && (currentUser.email.toLowerCase() === searchLower || currentUser.displayName === searchVal)) {
-          res.innerHTML = `<div class="uc-notfound">That's your own email / account!</div>`;
-          return;
-        }
-        res.innerHTML = `<div class="uc-notfound">No user found matching "${escapeHtml(searchVal)}".</div>`;
-        return;
-      }
-
-      // Render all matched contacts
-      const cardsHtml = Array.from(matchedMap.values()).map(peer => {
-        const isBlocked = myBlockedUsers.includes(peer.id);
-        const nameText = escapeHtml(peer.name || "User");
-        const emailText = escapeHtml(peer.email || "");
-        return `
-          <div class="user-card" style="margin-bottom:8px">
-            <div class="av">${peer.photoURL ? `<img src="${peer.photoURL}"/>` : initials(peer.name)}</div>
-            <div class="uc-info">
-              <div class="uc-name">${nameText}${isBlocked ? ' <span style="color:var(--red);font-size:.72rem">🚫 Blocked</span>' : ''}</div>
-              <div class="uc-email">${emailText}</div>
-            </div>
-            ${isBlocked
-              ? `<button class="btn-unblock" onclick="unblockUser('${peer.id}')">✓ Unblock</button>`
-              : `<button class="btn-primary" onclick="startChat('${peer.id}')">Chat</button>`
-            }
-          </div>`;
-      }).join("");
-
-      res.innerHTML = cardsHtml;
-    } catch (err) {
-      console.error("findUser error:", err);
-      if (err.code === "permission-denied" || err.message?.includes("permission")) {
-        res.innerHTML = `<div class="uc-notfound" style="color:var(--red);line-height:1.4">
-          <strong>Permission Denied</strong><br>
-          <small>Make sure Firestore rules in Firebase Console allow reading <code>/users</code>.</small>
-        </div>`;
-      } else {
-        res.innerHTML = `<div class="uc-notfound" style="color:var(--red)">Search failed: ${escapeHtml(err.message || "Unknown error")}</div>`;
-      }
+    const q = query(collection(db, "users"), where("email", "==", val.trim().toLowerCase()), limit(1));
+    const snap = await getDocs(q);
+    if (snap.empty || snap.docs[0].id === currentUser.uid) {
+      res.innerHTML = `<div class="uc-notfound">No user found with that email.</div>`; return;
     }
-  }, 350);
+    const peer = { id: snap.docs[0].id, ...snap.docs[0].data() };
+    const isBlocked = myBlockedUsers.includes(peer.id);
+    res.innerHTML = `
+      <div class="user-card">
+        <div class="av">${peer.photoURL ? `<img src="${esc(peer.photoURL)}"/>` : esc(initials(peer.name))}</div>
+        <div class="uc-info">
+          <div class="uc-name">${esc(peer.name)}${isBlocked ? ' <span style="color:var(--red);font-size:.72rem">🚫 Blocked</span>' : ''}</div>
+          <div class="uc-email">${esc(peer.email)}</div>
+        </div>
+        ${isBlocked
+          ? `<button class="btn-unblock" onclick="unblockUser('${esc(peer.id)}')">✓ Unblock</button>`
+          : `<button class="btn-primary" onclick="startChat('${esc(peer.id)}')">Chat</button>`
+        }
+      </div>`;
+  }, 500);
 };
 
 window.startChat = async (peerId) => {
@@ -1042,7 +1026,20 @@ window.startChat = async (peerId) => {
   }
 };
 
-// ── PEER PRESENCE VIA SUPABASE (Zero Firestore Reads) ──
+// ── PEER PRESENCE INSPECTOR ──
+function checkPeerIsLive(peerId) {
+  if (!presenceChannel || !peerId) return false;
+  const state = presenceChannel.presenceState();
+  // Check all active presences across all tabs/sessions for this user
+  for (const key in state) {
+    const metas = state[key];
+    if (metas && metas.some(m => m.uid === peerId && m.online === true)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function renderPeerPresenceUI(isOnline, lastSeenIso) {
   const st = document.getElementById("peer-status");
   if (!st) return;
@@ -1051,19 +1048,42 @@ function renderPeerPresenceUI(isOnline, lastSeenIso) {
     st.className = "peer-status";
     return;
   }
+
   let lastSeenMs = 0;
   if (lastSeenIso) {
     lastSeenMs = new Date(lastSeenIso).getTime();
   }
-  st.textContent = isOnline ? "online" : (lastSeenMs > 0 ? `last seen ${fmtTime(lastSeenMs)}` : "offline");
-  st.className = `peer-status${isOnline ? " online" : ""}`;
+
+  if (isOnline) {
+    st.textContent = "online";
+    st.className = "peer-status online";
+  } else {
+    st.textContent = lastSeenMs > 0 ? `last seen ${fmtTime(lastSeenMs)}` : "offline";
+    st.className = "peer-status";
+  }
 }
 
 function syncPeerPresenceState(peerId) {
   if (!peerId || amIBlocked) return;
-  const isLive = !!(presenceChannel?.presenceState()?.[peerId]);
+  const isLive = checkPeerIsLive(peerId);
   if (isLive) {
     renderPeerPresenceUI(true, null);
+  } else {
+    supabase
+      .from("user_presence")
+      .select("is_online, last_seen")
+      .eq("user_id", peerId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!checkPeerIsLive(peerId)) {
+          renderPeerPresenceUI(data?.is_online === true, data?.last_seen);
+        }
+      })
+      .catch(() => {
+        if (!checkPeerIsLive(peerId)) {
+          renderPeerPresenceUI(false, null);
+        }
+      });
   }
 }
 
@@ -1077,10 +1097,10 @@ async function listenPeerSupabasePresence(peerId) {
     return;
   }
 
-  // 1. Check WebSocket live presence room immediately
-  const isLiveInRoom = !!(presenceChannel?.presenceState()?.[peerId]);
+  // 1. Initial check against Realtime Channel
+  const isCurrentlyLive = checkPeerIsLive(peerId);
 
-  // 2. Query initial last_seen from Supabase user_presence table
+  // 2. Query initial fallback timestamp from user_presence DB
   try {
     const { data } = await supabase
       .from("user_presence")
@@ -1088,17 +1108,13 @@ async function listenPeerSupabasePresence(peerId) {
       .eq("user_id", peerId)
       .maybeSingle();
 
-    if (data) {
-      const online = isLiveInRoom || data.is_online === true;
-      renderPeerPresenceUI(online, data.last_seen);
-    } else {
-      renderPeerPresenceUI(isLiveInRoom, null);
-    }
+    const isOnline = isCurrentlyLive || (data?.is_online === true);
+    renderPeerPresenceUI(isOnline, data?.last_seen);
   } catch (e) {
-    renderPeerPresenceUI(isLiveInRoom, null);
+    renderPeerPresenceUI(isCurrentlyLive, null);
   }
 
-  // 3. Listen to realtime updates on user_presence table for this peer
+  // 3. Listen to realtime DB updates for last-seen transitions
   const subChannel = supabase
     .channel(`peer-presence-${peerId}`)
     .on("postgres_changes", {
@@ -1108,8 +1124,8 @@ async function listenPeerSupabasePresence(peerId) {
       filter: `user_id=eq.${peerId}`
     }, (payload) => {
       if (payload.new) {
-        const isLive = !!(presenceChannel?.presenceState()?.[peerId]);
-        renderPeerPresenceUI(isLive || payload.new.is_online === true, payload.new.last_seen);
+        const live = checkPeerIsLive(peerId) || payload.new.is_online === true;
+        renderPeerPresenceUI(live, payload.new.last_seen);
       }
     })
     .subscribe();
@@ -1130,11 +1146,15 @@ window.openChat = async (convId, peerId, peer) => {
   currentConvId = convId;
   currentPeer = { id: peerId, ...peer };
   
-  // ── SHADOW BLOCK: check if the peer has blocked ME ──
-  amIBlocked = (currentPeer.blockedUsers || []).includes(currentUser.uid);
-  
   // Fetch peer info from cache (or Firestore if needed)
   const peerData = await fetchUserCached(peerId);
+  if (peerData) {
+    currentPeer = { id: peerId, ...peer, ...peerData };
+  }
+
+  // ── SHADOW BLOCK: check if the peer has blocked ME ──
+  amIBlocked = (peerData?.blockedUsers || []).includes(currentUser.uid);
+  
   if (peerData && peerData.publicKey) {
       currentSharedKey = await deriveSharedKey(peerData.publicKey);
   } else {
@@ -1161,6 +1181,11 @@ window.openChat = async (convId, peerId, peer) => {
       usersCache.set(peerId, data);
       document.getElementById("peer-name").textContent = data.name || "Unknown";
       avatarEl(document.getElementById("peer-av"), data.name, data.photoURL);
+      const isNowBlocked = (data.blockedUsers || []).includes(currentUser.uid);
+      if (isNowBlocked !== amIBlocked) {
+        amIBlocked = isNowBlocked;
+        if (amIBlocked) renderPeerPresenceUI(false, null);
+      }
     });
     const origUnsub = unsubPeerPresence;
     unsubPeerPresence = () => {
@@ -1209,22 +1234,38 @@ function listenMessages(convId) {
         const msg = { id: d.id, ...d.data() };
         if (msg.senderId === currentUser.uid && d.metadata.hasPendingWrites) msg.isPending = true;
         
-        // Check if string is at least 38 chars and strictly formatted as Base64
-        const isBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(msg.text);
-        
-        if (msg.text && currentSharedKey && msg.text.length >= 38 && isBase64) { 
+        // Explicit encrypted flag takes precedence.
+        // Legacy fallback: for older messages sent before encrypted flag existed, check length & base64
+        const isLegacyEncrypted = msg.encrypted === undefined &&
+          currentSharedKey &&
+          msg.text &&
+          msg.text.length >= 38 &&
+          /^[A-Za-z0-9+/]+={0,2}$/.test(msg.text);
+
+        const shouldDecrypt = currentSharedKey && (msg.encrypted === true || isLegacyEncrypted);
+
+        if (shouldDecrypt) {
+          if (msg.text) {
             msg.text = await decryptText(msg.text, currentSharedKey);
-        }
-        if (msg.image && currentSharedKey && !msg.image.startsWith("http")) {
+          }
+          if (msg.image && !msg.image.startsWith("http")) {
             msg.image = await decryptText(msg.image, currentSharedKey);
-        }
-        
-        // 👈 FIX 3: Add this block to decrypt reply snippets
-        if (msg.replyTo && msg.replyTo.text && currentSharedKey) {
-            const isBase64Reply = /^[A-Za-z0-9+/]+={0,2}$/.test(msg.replyTo.text);
-            if (msg.replyTo.text.length >= 38 && isBase64Reply) {
-                msg.replyTo.text = await decryptText(msg.replyTo.text, currentSharedKey);
+          }
+          if (msg.replyTo && msg.replyTo.text) {
+            msg.replyTo.text = await decryptText(msg.replyTo.text, currentSharedKey);
+          }
+          if (msg.preview && typeof msg.preview === "string") {
+            try {
+              const decryptedPreview = await decryptText(msg.preview, currentSharedKey);
+              if (decryptedPreview && !decryptedPreview.startsWith("🔒")) {
+                msg.preview = JSON.parse(decryptedPreview);
+              } else {
+                msg.preview = null;
+              }
+            } catch {
+              msg.preview = null;
             }
+          }
         }
         
         return { msg, d };
@@ -1237,7 +1278,7 @@ function listenMessages(convId) {
       if (dateStr !== lastDate) {
         const sep = document.createElement("div");
         sep.className = "date-sep";
-        sep.innerHTML = `<span>${dateStr}</span>`;
+        sep.innerHTML = `<span>${esc(dateStr)}</span>`;
         inner.appendChild(sep);
         lastDate = dateStr;
       }
@@ -1292,7 +1333,7 @@ function buildMsgEl(msg) {
   if (!isMe) {
     const av = document.createElement("div");
     av.className = "av msg-av";
-    av.innerHTML = currentPeer?.photoURL ? `<img src="${currentPeer.photoURL}"/>` : initials(currentPeer?.name || "?");
+    av.innerHTML = currentPeer?.photoURL ? `<img src="${esc(currentPeer.photoURL)}"/>` : esc(initials(currentPeer?.name || "?"));
     row.appendChild(av);
   }
   
@@ -1304,8 +1345,8 @@ function buildMsgEl(msg) {
     const repBox = document.createElement("div");
     repBox.className = "msg-reply-box";
     repBox.onclick = () => scrollToMsg(msg.replyTo.id);
-    repBox.innerHTML = `<div class="msg-reply-name">${msg.replyTo.senderName}</div>
-                        <div class="msg-reply-text">${msg.replyTo.text}</div>`;
+    repBox.innerHTML = `<div class="msg-reply-name">${esc(msg.replyTo.senderName)}</div>
+                        <div class="msg-reply-text">${esc(msg.replyTo.text)}</div>`;
     bubble.appendChild(repBox);
   }
 
@@ -1313,10 +1354,11 @@ function buildMsgEl(msg) {
   if (msg.image) {
     bubble.classList.add("has-img");
     const a = document.createElement("a");
-    a.href = msg.image;
+    const safeImg = /^(https?:\/\/|data:image\/)/i.test(msg.image) ? msg.image : "#";
+    a.href = safeImg;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.innerHTML = `<img src="${msg.image}" class="chat-img" alt="image" loading="lazy">`;
+    a.innerHTML = `<img src="${esc(msg.image)}" class="chat-img" alt="image" loading="lazy">`;
     bubble.appendChild(a);
   }
   
@@ -1332,9 +1374,9 @@ function buildMsgEl(msg) {
   metaDiv.className = "msg-meta";
   
   if (isMe) {
-    metaDiv.innerHTML = `${fmtTime(msg.createdAt)} <span class="msg-status sent">&#10003;&#10003;</span>`;
+    metaDiv.innerHTML = `${esc(fmtTime(msg.createdAt))} <span class="msg-status sent">&#10003;&#10003;</span>`;
   } else {
-    metaDiv.innerHTML = `${fmtTime(msg.createdAt)}`;
+    metaDiv.innerHTML = `${esc(fmtTime(msg.createdAt))}`;
   }
   bubble.appendChild(metaDiv);
 
@@ -1342,16 +1384,17 @@ function buildMsgEl(msg) {
   if (msg.preview) {
     const p = msg.preview;
     const a = document.createElement('a');
-    a.href = p.url;
+    const safeUrl = /^https?:\/\//i.test(p.url) ? p.url : "#";
+    a.href = safeUrl;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.className = 'msg-link-preview';
     a.innerHTML = `
-      ${p.image ? `<img src="${p.image}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+      ${p.image ? `<img src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
       <div class="lp-inner">
-        <div class="lp-domain">${p.domain || ''}</div>
-        <div class="lp-title">${p.title || p.url}</div>
-        ${p.description ? `<div class="lp-desc">${p.description}</div>` : ''}
+        <div class="lp-domain">${esc(p.domain || '')}</div>
+        <div class="lp-title">${esc(p.title || p.url)}</div>
+        ${p.description ? `<div class="lp-desc">${esc(p.description)}</div>` : ''}
       </div>`;
     bubble.appendChild(a);
   }
@@ -1402,35 +1445,46 @@ window.sendMsg = async (customText, imgUrl) => {
   if (!text && !imgUrl) return;          // must have text OR image
   if (!currentConvId || !currentPeer) return;
   if (!imgUrl) { inp.value = ""; autoResize(inp); }
+  const isE2EE = !!currentSharedKey;
+
   // Build message document
   const msgData = {
     senderId: currentUser.uid,
     createdAt: serverTimestamp(),
-    ...(imgUrl ? { image: imgUrl } : {}),
-    ...(currentLinkPreview && !imgUrl ? { preview: currentLinkPreview } : {})
+    encrypted: isE2EE,
+    ...(imgUrl ? { image: imgUrl } : {})
   };
 
-  // 👈 FIX 2: Encrypt the reply snippet
+  // Encrypt the reply snippet
   if (replyingTo) {
     msgData.replyTo = {
       id: replyingTo.id,
       senderName: replyingTo.senderName,
       text: replyingTo.text
     };
-    if (currentSharedKey) {
+    if (isE2EE) {
       msgData.replyTo.text = await encryptText(replyingTo.text, currentSharedKey);
     }
   }
 
-  // 👈 E2EE UPDATE: Encrypt text if we have a shared key
+  // Encrypt link preview for E2EE chats
+  if (currentLinkPreview && !imgUrl) {
+    if (isE2EE) {
+      msgData.preview = await encryptText(JSON.stringify(currentLinkPreview), currentSharedKey);
+    } else {
+      msgData.preview = currentLinkPreview;
+    }
+  }
+
+  // Encrypt text if we have a shared key
   if (text) {
-      if (currentSharedKey) {
-          msgData.text = await encryptText(text, currentSharedKey);
-      } else {
-          msgData.text = text; // Fallback for non-E2EE accounts
-      }
+    if (isE2EE) {
+      msgData.text = await encryptText(text, currentSharedKey);
+    } else {
+      msgData.text = text; // Fallback for non-E2EE accounts
+    }
   } else {
-      msgData.text = "";
+    msgData.text = "";
   }
 
   await addDoc(collection(db, "conversations", currentConvId, "messages"), msgData);
@@ -1539,11 +1593,11 @@ async function fetchLinkPreview(url) {
     };
     card.className = 'link-preview-card';
     card.innerHTML = `
-      ${currentLinkPreview.image ? `<img class="lp-thumb" src="${currentLinkPreview.image}" alt="" onerror="this.style.display='none'">` : ''}
+      ${currentLinkPreview.image ? `<img class="lp-thumb" src="${esc(currentLinkPreview.image)}" alt="" onerror="this.style.display='none'">` : ''}
       <div class="lp-meta">
-        <div class="lp-domain">${currentLinkPreview.domain}</div>
-        <div class="lp-title">${currentLinkPreview.title || url}</div>
-        ${currentLinkPreview.description ? `<div class="lp-desc">${currentLinkPreview.description}</div>` : ''}
+        <div class="lp-domain">${esc(currentLinkPreview.domain)}</div>
+        <div class="lp-title">${esc(currentLinkPreview.title || url)}</div>
+        ${currentLinkPreview.description ? `<div class="lp-desc">${esc(currentLinkPreview.description)}</div>` : ''}
       </div>
       <button class="lp-dismiss" onclick="dismissLinkPreview()">✕</button>`;
   } catch {
@@ -1553,8 +1607,8 @@ async function fetchLinkPreview(url) {
     card.className = 'link-preview-card';
     card.innerHTML = `
       <div class="lp-meta">
-        <div class="lp-domain">${domain}</div>
-        <div class="lp-title">${url}</div>
+        <div class="lp-domain">${esc(domain)}</div>
+        <div class="lp-title">${esc(url)}</div>
       </div>
       <button class="lp-dismiss" onclick="dismissLinkPreview()">✕</button>`;
   }
@@ -1598,7 +1652,7 @@ window.ctxDelete = async () => {
 
 // ── CHAT MENU ──
 window.toggleChatMenu = () => document.getElementById("chat-ctx-menu").classList.toggle("hidden");
-document.addEventListener("click", (e) => { if (!e.target.closest("#chat-ctx-menu") && !e.target.closest(".ib")) document.getElementById("chat-ctx-menu")?.classList.add("hidden"); });
+document.addEventListener("click", (e) => { if (!e.target.closest("#chat-ctx-menu") && !e.target.closest("#chat-menu-btn")) document.getElementById("chat-ctx-menu")?.classList.add("hidden"); });
 
 // ── BLOCK USER ──
 window.blockUser = async () => {
@@ -1635,12 +1689,12 @@ window.openBlockedModal = async () => {
   }));
   list.innerHTML = items.map(u => `
     <div class="user-card">
-      <div class="av">${u.photoURL ? `<img src="${u.photoURL}"/>` : initials(u.name)}</div>
+      <div class="av">${u.photoURL ? `<img src="${esc(u.photoURL)}"/>` : esc(initials(u.name))}</div>
       <div class="uc-info">
-        <div class="uc-name">${u.name}</div>
-        <div class="uc-email">${u.email || u.uid}</div>
+        <div class="uc-name">${esc(u.name)}</div>
+        <div class="uc-email">${esc(u.email || u.uid)}</div>
       </div>
-      <button class="btn-unblock" onclick="unblockUser('${u.uid}')">Unblock</button>
+      <button class="btn-unblock" onclick="unblockUser('${esc(u.uid)}')">Unblock</button>
     </div>`).join('');
 };
 
@@ -1768,6 +1822,13 @@ window.toggleEmoji = () => {
 window.addEmoji = (e) => {
   const inp = document.getElementById("msg-inp");
   inp.value += e;
+  if (typeof autoResize === "function") autoResize(inp);
+  inp.dispatchEvent(new Event("input", { bubbles: true }));
   inp.focus();
+  document.getElementById("emoji-box")?.classList.add("hidden");
 };
-document.addEventListener("click", (e) => { if (!e.target.closest(".input-area")) document.getElementById("emoji-box")?.classList.add("hidden"); });
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#emoji-box") && !e.target.closest(".emoji-toggle")) {
+    document.getElementById("emoji-box")?.classList.add("hidden");
+  }
+});
