@@ -328,7 +328,25 @@ window.showErr = (msg) => {
   el.classList.remove("hidden");
   setTimeout(() => el.classList.add("hidden"), 5000);
 };
-window.openModal = (id) => document.getElementById(id).classList.remove("hidden");
+const escapeHtml = (str) => {
+  if (!str) return "";
+  return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+};
+
+window.openModal = (id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove("hidden");
+  if (id === "new-chat-modal") {
+    const inp = document.getElementById("find-email");
+    const res = document.getElementById("find-result");
+    if (inp) {
+      inp.value = "";
+      setTimeout(() => inp.focus(), 100);
+    }
+    if (res) res.innerHTML = "";
+  }
+};
 window.closeModal = (id) => document.getElementById(id).classList.add("hidden");
 window.maybeCloseModal = (e, id) => { if (e.target === e.currentTarget) closeModal(id); };
 
@@ -910,29 +928,91 @@ let findTimer = null;
 window.findUser = (val) => {
   clearTimeout(findTimer);
   const res = document.getElementById("find-result");
-  if (!val || val.length < 3) { res.innerHTML = ""; return; }
+  if (!val || val.trim().length < 2) { res.innerHTML = ""; return; }
+  
   findTimer = setTimeout(async () => {
     res.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:8px 0">Searching…</div>`;
-    const q = query(collection(db, "users"), where("email", "==", val.trim().toLowerCase()), limit(1));
-    const snap = await getDocs(q);
-    if (snap.empty || snap.docs[0].id === currentUser.uid) {
-      res.innerHTML = `<div class="uc-notfound">No user found with that email.</div>`; return;
-    }
-    const peer = { id: snap.docs[0].id, ...snap.docs[0].data() };
-    const isBlocked = myBlockedUsers.includes(peer.id);
-    res.innerHTML = `
-      <div class="user-card">
-        <div class="av">${peer.photoURL ? `<img src="${peer.photoURL}"/>` : initials(peer.name)}</div>
-        <div class="uc-info">
-          <div class="uc-name">${peer.name}${isBlocked ? ' <span style="color:var(--red);font-size:.72rem">🚫 Blocked</span>' : ''}</div>
-          <div class="uc-email">${peer.email}</div>
-        </div>
-        ${isBlocked
-          ? `<button class="btn-unblock" onclick="unblockUser('${peer.id}')">✓ Unblock</button>`
-          : `<button class="btn-primary" onclick="startChat('${peer.id}')">Chat</button>`
+    const searchVal = val.trim();
+    const searchLower = searchVal.toLowerCase();
+
+    try {
+      const usersRef = collection(db, "users");
+      const matchedMap = new Map();
+
+      // 1. Exact match by lowercase email
+      try {
+        const snapEmailLower = await getDocs(query(usersRef, where("email", "==", searchLower), limit(5)));
+        snapEmailLower.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
+      } catch (e) {
+        console.warn("Email lower query error:", e);
+      }
+
+      // 2. Exact match by typed email (if casing differed)
+      if (searchVal !== searchLower && matchedMap.size === 0) {
+        try {
+          const snapEmailExact = await getDocs(query(usersRef, where("email", "==", searchVal), limit(5)));
+          snapEmailExact.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
+        } catch (e) {}
+      }
+
+      // 3. Exact match by name
+      if (matchedMap.size === 0) {
+        try {
+          const snapName = await getDocs(query(usersRef, where("name", "==", searchVal), limit(5)));
+          snapName.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
+        } catch (e) {}
+      }
+
+      // 4. Prefix match by name (e.g. typing "Esw" finds "Eswar")
+      if (matchedMap.size === 0 && searchVal.length >= 2) {
+        try {
+          const snapNamePrefix = await getDocs(query(usersRef, where("name", ">=", searchVal), where("name", "<=", searchVal + "\uf8ff"), limit(5)));
+          snapNamePrefix.forEach(d => { if (d.id !== currentUser?.uid) matchedMap.set(d.id, { id: d.id, ...d.data() }); });
+        } catch (e) {}
+      }
+
+      // Check if user searched for themselves
+      if (matchedMap.size === 0) {
+        if (currentUser?.email && (currentUser.email.toLowerCase() === searchLower || currentUser.displayName === searchVal)) {
+          res.innerHTML = `<div class="uc-notfound">That's your own email / account!</div>`;
+          return;
         }
-      </div>`;
-  }, 500);
+        res.innerHTML = `<div class="uc-notfound">No user found matching "${escapeHtml(searchVal)}".</div>`;
+        return;
+      }
+
+      // Render all matched contacts
+      const cardsHtml = Array.from(matchedMap.values()).map(peer => {
+        const isBlocked = myBlockedUsers.includes(peer.id);
+        const nameText = escapeHtml(peer.name || "User");
+        const emailText = escapeHtml(peer.email || "");
+        return `
+          <div class="user-card" style="margin-bottom:8px">
+            <div class="av">${peer.photoURL ? `<img src="${peer.photoURL}"/>` : initials(peer.name)}</div>
+            <div class="uc-info">
+              <div class="uc-name">${nameText}${isBlocked ? ' <span style="color:var(--red);font-size:.72rem">🚫 Blocked</span>' : ''}</div>
+              <div class="uc-email">${emailText}</div>
+            </div>
+            ${isBlocked
+              ? `<button class="btn-unblock" onclick="unblockUser('${peer.id}')">✓ Unblock</button>`
+              : `<button class="btn-primary" onclick="startChat('${peer.id}')">Chat</button>`
+            }
+          </div>`;
+      }).join("");
+
+      res.innerHTML = cardsHtml;
+    } catch (err) {
+      console.error("findUser error:", err);
+      if (err.code === "permission-denied" || err.message?.includes("permission")) {
+        res.innerHTML = `<div class="uc-notfound" style="color:var(--red);line-height:1.4">
+          <strong>Permission Denied</strong><br>
+          <small>Make sure Firestore rules in Firebase Console allow reading <code>/users</code>.</small>
+        </div>`;
+      } else {
+        res.innerHTML = `<div class="uc-notfound" style="color:var(--red)">Search failed: ${escapeHtml(err.message || "Unknown error")}</div>`;
+      }
+    }
+  }, 350);
 };
 
 window.startChat = async (peerId) => {

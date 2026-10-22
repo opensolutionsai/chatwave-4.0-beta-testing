@@ -219,8 +219,8 @@
     <div class="modal-head"><h3>New Conversation</h3><button onclick="closeModal('new-chat-modal')">✕</button></div>
     <div class="modal-body">
       <div class="fg">
-        <label>Find user by Email</label>
-        <div class="iw"><span>🔍</span><input type="email" id="find-email" placeholder="friend@example.com" oninput="findUser(this.value)"/></div>
+        <label>Find user by Email or Name</label>
+        <div class="iw"><span>🔍</span><input type="text" id="find-email" placeholder="Enter email or name…" oninput="findUser(this.value)" autocomplete="off"/></div>
       </div>
       <div id="find-result"></div>
     </div>
