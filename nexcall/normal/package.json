@@ -1,0 +1,17 @@
+{
+  "name": "nexcall",
+  "version": "1.0.0",
+  "description": "NexCall - Premium WebRTC P2P Video Calling Web App",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npx http-server -p 8080"
+  },
+  "keywords": [
+    "webrtc",
+    "firebase",
+    "p2p",
+    "video-calling"
+  ],
+  "author": "",
+  "license": "ISC"
+}

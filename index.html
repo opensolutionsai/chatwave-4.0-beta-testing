@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>ChatWave Ultra</title>
   <meta name="description" content="ChatWave Ultra — Real-time chat reimagined."/>
-  <meta name="theme-color" content="#7C3AED"/>
+  <meta name="theme-color" content="#0f131c"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="ChatWave"/>
@@ -14,7 +14,8 @@
   <link rel="icon" type="image/png" href="icon.png"/>
   <link rel="apple-touch-icon" href="icon.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css"/>
 </head>
@@ -23,9 +24,9 @@
 <!-- SPLASH SCREEN -->
 <div id="splash-screen" class="screen active" style="align-items:center;justify-content:center;background:var(--bg);z-index:9999;flex-direction:column;gap:16px;">
   <div class="brand-icon" style="animation: pulse 1.5s infinite ease-in-out;">
-    <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M20 2C10.06 2 2 10.06 2 20c0 3.42.98 6.62 2.66 9.33L2.1 37.9l8.77-2.52C13.5 36.9 16.65 37.8 20 37.8c9.94 0 18-8.06 18-18S29.94 2 20 2z" fill="url(#gSplash)"/><path d="M13 16h14M13 22h9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><defs><linearGradient id="gSplash" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs></svg>
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M20 2C10.06 2 2 10.06 2 20c0 3.42.98 6.62 2.66 9.33L2.1 37.9l8.77-2.52C13.5 36.9 16.65 37.8 20 37.8c9.94 0 18-8.06 18-18S29.94 2 20 2z" fill="url(#gSplash)"/><path d="M13 16h14M13 22h9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><defs><linearGradient id="gSplash" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse"><stop stop-color="#4F46E5"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs></svg>
   </div>
-  <div style="color:var(--text2);font-weight:600;font-size:0.9rem;letter-spacing:1px;">LOADING...</div>
+  <div style="color:var(--text2);font-weight:600;font-size:0.85rem;letter-spacing:1.5px;font-family:var(--font-mono)">LOADING...</div>
 </div>
 
 <!-- AUTH SCREEN -->
@@ -38,15 +39,11 @@
   <div class="auth-card">
     <div class="auth-brand">
       <div class="brand-icon">
-        <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
-          <path d="M20 2C10.06 2 2 10.06 2 20c0 3.42.98 6.62 2.66 9.33L2.1 37.9l8.77-2.52C13.5 36.9 16.65 37.8 20 37.8c9.94 0 18-8.06 18-18S29.94 2 20 2z" fill="url(#g1)"/>
-          <path d="M13 16h14M13 22h9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-          <defs><linearGradient id="g1" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
-        </svg>
+        <span class="material-symbols-outlined" style="font-size:28px;color:#fff">forum</span>
       </div>
       <div>
         <h1 class="brand-name">ChatWave <span>Ultra</span></h1>
-        <p class="brand-sub">Real-time chat. Reimagined.</p>
+        <p class="brand-sub">Minimalist SaaS Messenger</p>
       </div>
     </div>
 
@@ -58,19 +55,34 @@
     <!-- Login -->
     <form id="form-login" class="auth-form active" onsubmit="doLogin(event)">
       <div class="fg">
-        <label>Email</label>
-        <div class="iw"><span>✉️</span><input type="email" id="li-email" placeholder="you@example.com" required/></div>
+        <label>Email address</label>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">mail</span>
+          <input type="email" id="li-email" placeholder="alex@example.com" required/>
+        </div>
       </div>
       <div class="fg">
-        <label>Password</label>
-        <div class="iw"><span>🔒</span><input type="password" id="li-pw" placeholder="Your password" required/><button type="button" class="eye-btn" onclick="togglePw('li-pw',this)">👁</button></div>
+        <div class="fg-label-row">
+          <label>Password</label>
+          <button type="button" class="forgot" onclick="doForgot()">Forgot password?</button>
+        </div>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">lock</span>
+          <input type="password" id="li-pw" placeholder="••••••••••••" required/>
+          <button type="button" class="eye-btn" onclick="togglePw('li-pw',this)" title="Toggle visibility">
+            <span class="material-symbols-outlined">visibility</span>
+          </button>
+        </div>
       </div>
-      <button type="button" class="forgot" onclick="doForgot()">Forgot password?</button>
-      <button type="submit" class="btn-primary" id="li-btn"><span class="bt">Sign In</span><span class="bl hidden"></span></button>
-      <div class="divider"><span>or</span></div>
+      <button type="submit" class="btn-primary auth-submit" id="li-btn">
+        <span class="bt">Sign In to ChatWave</span>
+        <span class="material-symbols-outlined btn-arrow">arrow_forward</span>
+        <span class="bl hidden"></span>
+      </button>
+      <div class="divider"><span>or continue with</span></div>
       <button type="button" class="btn-google" onclick="doGoogle()">
         <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Continue with Google
+        <span>Continue with Google</span>
       </button>
     </form>
 
@@ -78,34 +90,55 @@
     <form id="form-reg" class="auth-form" onsubmit="doRegister(event)">
       <div class="fg">
         <label>Display Name</label>
-        <div class="iw"><span>👤</span><input type="text" id="rg-name" placeholder="Your name" required/></div>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">badge</span>
+          <input type="text" id="rg-name" placeholder="Alex Vance" required/>
+        </div>
       </div>
       <div class="fg">
-        <label>Email</label>
-        <div class="iw"><span>✉️</span><input type="email" id="rg-email" placeholder="you@example.com" required/></div>
+        <label>Email address</label>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">mail</span>
+          <input type="email" id="rg-email" placeholder="alex@example.com" required/>
+        </div>
       </div>
       <div class="fg">
         <label>Phone <span class="opt">(optional)</span></label>
-        <div class="iw"><span>📱</span><input type="tel" id="rg-phone" placeholder="+1 234 567 8900"/></div>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">phone</span>
+          <input type="tel" id="rg-phone" placeholder="+1 (555) 019-2834"/>
+        </div>
       </div>
       <div class="fg">
         <label>Password</label>
-        <div class="iw"><span>🔒</span><input type="password" id="rg-pw" placeholder="Min 6 characters" required minlength="6"/><button type="button" class="eye-btn" onclick="togglePw('rg-pw',this)">👁</button></div>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">lock</span>
+          <input type="password" id="rg-pw" placeholder="Min 6 characters" required minlength="6"/>
+          <button type="button" class="eye-btn" onclick="togglePw('rg-pw',this)" title="Toggle visibility">
+            <span class="material-symbols-outlined">visibility</span>
+          </button>
+        </div>
       </div>
-      <button type="submit" class="btn-primary" id="rg-btn"><span class="bt">Create Account</span><span class="bl hidden"></span></button>
-      <div class="divider"><span>or</span></div>
+      <button type="submit" class="btn-primary auth-submit" id="rg-btn">
+        <span class="bt">Create Free Account</span>
+        <span class="material-symbols-outlined btn-arrow">arrow_forward</span>
+        <span class="bl hidden"></span>
+      </button>
+      <div class="divider"><span>or continue with</span></div>
       <button type="button" class="btn-google" onclick="doGoogle()">
         <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Continue with Google
+        <span>Continue with Google</span>
       </button>
     </form>
 
     <!-- Verify notice -->
     <div id="verify-notice" class="verify-box hidden">
-      <div style="font-size:2.5rem">✉️</div>
-      <h3>Check your email</h3>
+      <div class="verify-icon">
+        <span class="material-symbols-outlined" style="font-size:3rem;color:var(--secondary)">mark_email_unread</span>
+      </div>
+      <h3>Check your inbox</h3>
       <p>We sent a verification link to <strong id="vfy-email"></strong></p>
-      <button class="btn-primary" onclick="doResend()">Resend Email</button>
+      <button class="btn-primary" onclick="doResend()">Resend Verification Email</button>
       <button class="btn-ghost" onclick="switchTab('login')">Back to Sign In</button>
     </div>
 
@@ -115,89 +148,317 @@
 
 <!-- APP SCREEN -->
 <div id="app-screen" class="screen">
+  <!-- 64px Left Icon Rail (Stitch Obsidian Wave) -->
+  <nav class="nav-rail" id="nav-rail" aria-label="Main Navigation">
+    <div class="rail-top">
+      <button class="rail-btn active" id="rail-btn-chats" title="Chats" type="button" onclick="showChatsTab()">
+        <span class="material-symbols-outlined">chat</span>
+        <span class="rail-badge hidden" id="rail-unread-dot"></span>
+      </button>
+      <button class="rail-btn" id="rail-btn-calls" title="Calls & History" type="button" onclick="showCallsTab()">
+        <span class="material-symbols-outlined">call</span>
+      </button>
+      <button class="rail-btn" id="rail-btn-new-chat" title="New Chat" type="button" onclick="openModal('new-chat-modal')">
+        <span class="material-symbols-outlined">edit_square</span>
+      </button>
+    </div>
+    <div class="rail-bottom">
+      <button class="rail-btn" id="rail-btn-settings" title="Settings & Profile" type="button" onclick="showSettingsTab()">
+        <span class="material-symbols-outlined">settings</span>
+      </button>
+      <div class="rail-user-avatar" title="View Profile & Settings" onclick="showSettingsTab()">
+        <div class="av" id="rail-my-av">?</div>
+        <span class="rail-presence-dot"></span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sidebar (Chats Context Area) -->
   <aside class="sidebar" id="sidebar">
     <div class="sb-head">
-      <div class="sb-user" id="sb-user">
-        <div class="av-wrap"><div class="av" id="my-av">?</div><div class="dot"></div></div>
+      <div class="sb-user" id="sb-user" onclick="showSettingsTab()">
+        <div class="av-wrap">
+          <div class="av" id="my-av">?</div>
+          <div class="dot"></div>
+        </div>
         <div class="sb-user-info">
           <span class="sb-name" id="my-name">Loading...</span>
-          <span class="sb-online">Online</span>
+          <span class="sb-online" id="my-status-label">Online</span>
         </div>
       </div>
       <div class="sb-actions">
         <button class="ib" title="New Chat" onclick="openModal('new-chat-modal')">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="9" y1="11" x2="15" y2="11"/></svg>
+          <span class="material-symbols-outlined">edit_square</span>
         </button>
-        <button class="ib" title="Profile" onclick="openModal('profile-modal')">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <button class="ib" title="Settings" onclick="showSettingsTab()">
+          <span class="material-symbols-outlined">settings</span>
         </button>
         <button class="ib danger" title="Logout" onclick="doLogout()">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span class="material-symbols-outlined">logout</span>
         </button>
       </div>
     </div>
-    <div class="search-wrap">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" id="search-inp" placeholder="Search conversations…" oninput="filterConvs(this.value)"/>
+
+    <!-- Search Bar & Category Filter Pills -->
+    <div class="sb-search-section">
+      <div class="search-wrap">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input type="text" id="search-inp" placeholder="Search or start new chat…" oninput="filterConvs(this.value)"/>
+      </div>
+      <div class="filter-pills" id="filter-pills">
+        <button type="button" class="pill active" id="filter-all" onclick="setConvFilter('all')">All</button>
+        <button type="button" class="pill" id="filter-unread" onclick="setConvFilter('unread')">
+          <span>Unread</span>
+          <span class="pill-badge hidden" id="unread-pill-badge">0</span>
+        </button>
+      </div>
     </div>
+
+    <!-- Conversations List -->
     <div class="conv-list" id="conv-list">
       <div class="empty-convs" id="empty-convs">
-        <div style="font-size:2.2rem">💬</div>
+        <span class="material-symbols-outlined empty-icon">chat_bubble_outline</span>
         <p>No conversations yet</p>
-        <small>Tap + to start chatting</small>
+        <small>Tap + or search by email to start chatting</small>
       </div>
+    </div>
+
+    <!-- Bottom E2EE Security Badge -->
+    <div class="sb-footer-e2ee">
+      <span class="material-symbols-outlined">lock</span>
+      <span>End-to-end encrypted</span>
+    </div>
+  </aside>
+
+  <!-- Calls Sidebar (Stitch chatwave_calls) -->
+  <aside class="sidebar hidden" id="sidebar-calls">
+    <div class="sb-head">
+      <div class="sb-user">
+        <div class="av-wrap">
+          <div class="av" id="calls-my-av">?</div>
+          <div class="dot"></div>
+        </div>
+        <div class="sb-user-info">
+          <h1 class="font-headline text-base font-semibold text-on-surface" style="font-size:1.05rem;">Calls</h1>
+          <span class="sb-online">WebRTC Active</span>
+        </div>
+      </div>
+      <div class="sb-actions">
+        <button class="ib" title="Start New Call" onclick="openStartCallModal()">
+          <span class="material-symbols-outlined">add_call</span>
+        </button>
+        <button class="ib" title="Refresh Call History" onclick="loadCallHistory()">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="sb-search-section">
+      <div class="search-wrap">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input type="text" id="search-calls-inp" placeholder="Search call history…" oninput="filterCallHistory(this.value)"/>
+      </div>
+      <div class="filter-pills" id="call-filter-pills">
+        <button type="button" class="pill active" id="call-filter-all" onclick="setCallHistoryFilter('all')">All</button>
+        <button type="button" class="pill" id="call-filter-missed" onclick="setCallHistoryFilter('missed')">Missed</button>
+      </div>
+    </div>
+
+    <!-- Start new call action card -->
+    <div class="start-call-strip">
+      <button type="button" class="start-call-card-btn" onclick="openStartCallModal()">
+        <div class="start-call-icon">
+          <span class="material-symbols-outlined">add_call</span>
+        </div>
+        <div class="start-call-meta">
+          <span class="start-call-heading">Start new call</span>
+          <span class="start-call-caption">Call a contact or enter email</span>
+        </div>
+        <span class="material-symbols-outlined start-call-chevron">chevron_right</span>
+      </button>
+    </div>
+
+    <!-- Calls History List -->
+    <div class="conv-list calls-list" id="calls-history-list">
+      <div class="empty-convs" id="empty-calls">
+        <span class="material-symbols-outlined empty-icon">phone_in_talk</span>
+        <p>No call history yet</p>
+        <small>Recent voice and video calls will appear here</small>
+      </div>
+    </div>
+
+    <!-- Bottom E2EE Trust Badge -->
+    <div class="sb-footer-e2ee">
+      <span class="material-symbols-outlined">lock</span>
+      <span>End-to-end encrypted calls</span>
+    </div>
+  </aside>
+
+  <!-- Settings Sidebar (Stitch chatwave_settings) -->
+  <aside class="sidebar hidden" id="sidebar-settings">
+    <div class="sb-head">
+      <div class="sb-user">
+        <h1 class="font-headline text-base font-semibold text-on-surface" style="font-size:1.15rem;margin:0;">Settings</h1>
+      </div>
+      <div class="sb-actions">
+        <button class="ib" title="Back to Chats" onclick="showChatsTab()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Settings -->
+    <div class="sb-search-section">
+      <div class="search-wrap">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input type="text" id="search-settings-inp" placeholder="Search settings…" oninput="filterSettingsSections(this.value)"/>
+      </div>
+    </div>
+
+    <!-- Profile Mini Card -->
+    <div class="settings-user-card" id="settings-sb-user-card" onclick="setSettingsSection('account')">
+      <div class="relative flex-shrink-0">
+        <div class="av settings-av" id="settings-sb-av">?</div>
+        <span class="settings-presence-dot"></span>
+      </div>
+      <div class="settings-user-meta">
+        <h3 class="settings-user-name" id="settings-sb-name">Loading...</h3>
+        <p class="settings-user-status" id="settings-sb-status">Available ⚡</p>
+      </div>
+      <span class="material-symbols-outlined settings-chevron">chevron_right</span>
+    </div>
+
+    <!-- Settings Category Items -->
+    <div class="settings-nav-list" id="settings-nav-list">
+      <button type="button" class="settings-nav-item active" id="set-nav-account" onclick="setSettingsSection('account')">
+        <div class="settings-nav-icon">
+          <span class="material-symbols-outlined">manage_accounts</span>
+        </div>
+        <div class="settings-nav-meta">
+          <span class="settings-nav-title">Account</span>
+          <span class="settings-nav-desc">Profile photo, name, phone, email</span>
+        </div>
+        <span class="material-symbols-outlined settings-nav-arrow">chevron_right</span>
+      </button>
+
+      <button type="button" class="settings-nav-item" id="set-nav-privacy" onclick="setSettingsSection('privacy')">
+        <div class="settings-nav-icon">
+          <span class="material-symbols-outlined">lock</span>
+        </div>
+        <div class="settings-nav-meta">
+          <span class="settings-nav-title">Privacy &amp; Security</span>
+          <span class="settings-nav-desc">E2EE PIN, encryption keys, zero-knowledge</span>
+        </div>
+        <span class="material-symbols-outlined settings-nav-arrow">chevron_right</span>
+      </button>
+
+      <button type="button" class="settings-nav-item" id="set-nav-blocked" onclick="setSettingsSection('blocked')">
+        <div class="settings-nav-icon">
+          <span class="material-symbols-outlined">block</span>
+        </div>
+        <div class="settings-nav-meta">
+          <span class="settings-nav-title">Blocked Contacts</span>
+          <span class="settings-nav-desc">Manage blocked numbers and users</span>
+        </div>
+        <span class="material-symbols-outlined settings-nav-arrow">chevron_right</span>
+      </button>
+
+      <button type="button" class="settings-nav-item" id="set-nav-notifications" onclick="setSettingsSection('notifications')">
+        <div class="settings-nav-icon">
+          <span class="material-symbols-outlined">notifications</span>
+        </div>
+        <div class="settings-nav-meta">
+          <span class="settings-nav-title">Notifications</span>
+          <span class="settings-nav-desc">Sound chimes, desktop push alerts</span>
+        </div>
+        <span class="material-symbols-outlined settings-nav-arrow">chevron_right</span>
+      </button>
+
+      <div class="settings-nav-divider"></div>
+
+      <button type="button" class="settings-nav-item danger" onclick="doLogout()">
+        <div class="settings-nav-icon danger">
+          <span class="material-symbols-outlined">logout</span>
+        </div>
+        <div class="settings-nav-meta">
+          <span class="settings-nav-title danger">Log Out</span>
+          <span class="settings-nav-desc">Sign out of ChatWave Web</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Bottom E2EE Security Badge -->
+    <div class="sb-footer-e2ee">
+      <span class="material-symbols-outlined">lock</span>
+      <span>End-to-end encrypted</span>
     </div>
   </aside>
 
   <main class="chat-main" id="chat-main">
-    <!-- Welcome -->
+    <!-- Welcome Screen -->
     <div class="welcome" id="welcome">
       <div class="welcome-glow"></div>
       <div class="welcome-icon">
-        <svg width="70" height="70" viewBox="0 0 40 40" fill="none">
-          <path d="M20 2C10.06 2 2 10.06 2 20c0 3.42.98 6.62 2.66 9.33L2.1 37.9l8.77-2.52C13.5 36.9 16.65 37.8 20 37.8c9.94 0 18-8.06 18-18S29.94 2 20 2z" fill="url(#g2)"/>
-          <path d="M13 16h14M13 22h9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-          <defs><linearGradient id="g2" x1="2" y1="2" x2="38" y2="38" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs>
-        </svg>
+        <div class="brand-glyph">
+          <span class="material-symbols-outlined">forum</span>
+        </div>
       </div>
-      <h2>Welcome to <span>ChatWave Ultra</span></h2>
-      <p>Select a conversation or start a new one</p>
-      <button class="btn-primary" onclick="openModal('new-chat-modal')">Start a Conversation</button>
+      <h2>ChatWave <span>Ultra</span></h2>
+      <p>Minimalist, real-time end-to-end encrypted communication</p>
+      <button class="btn-primary welcome-start-btn" onclick="openModal('new-chat-modal')">
+        <span class="material-symbols-outlined">edit_square</span>
+        <span>Start a Conversation</span>
+      </button>
     </div>
 
-    <!-- Active chat -->
+    <!-- Active Chat View -->
     <div class="chat-view hidden" id="chat-view">
-      <div class="chat-head" id="chat-head">
-        <button class="ib" onclick="closeChat()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      <header class="chat-head" id="chat-head">
+        <button class="ib back-btn" onclick="closeChat()" title="Back">
+          <span class="material-symbols-outlined">arrow_back</span>
         </button>
         <div class="peer-info">
           <div class="av peer-av" id="peer-av">?</div>
-          <div>
+          <div class="peer-text">
             <span class="peer-name" id="peer-name">—</span>
             <span class="peer-status" id="peer-status">offline</span>
           </div>
         </div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;position:relative">
-          <button class="ib" id="btn-voice-call" title="Voice Call" onclick="startCall('audio')">
-            <span class="material-symbols-outlined" style="font-size:20px">call</span>
+        <div class="chat-actions">
+          <button class="ib" id="btn-voice-call" title="Voice Call" onclick="startCall('voice')">
+            <span class="material-symbols-outlined">call</span>
           </button>
           <button class="ib" id="btn-video-call" title="Video Call" onclick="startCall('video')">
-            <span class="material-symbols-outlined" style="font-size:20px">videocam</span>
+            <span class="material-symbols-outlined">videocam</span>
           </button>
-          <div class="call-btn-divider"></div>
-          <button class="ib" id="chat-menu-btn" onclick="toggleChatMenu()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+          <div class="head-divider"></div>
+          <button class="ib" id="chat-menu-btn" onclick="toggleChatMenu()" title="More Options">
+            <span class="material-symbols-outlined">more_vert</span>
           </button>
           <div class="chat-ctx-menu hidden" id="chat-ctx-menu">
-            <button onclick="clearChat()">Clear History (For Me)</button>
-            <button onclick="clearChatEveryone()">Clear History (For Everyone)</button>
-            <button onclick="deleteConv()">Delete Chat (For Me)</button>
-            <button onclick="deleteConvEveryone()">Delete Chat (For Everyone)</button>
-            <button onclick="blockUser()" id="block-btn">🚫 Block User</button>
+            <button onclick="clearChat()">
+              <span class="material-symbols-outlined">cleaning_services</span>
+              <span>Clear History (For Me)</span>
+            </button>
+            <button onclick="clearChatEveryone()">
+              <span class="material-symbols-outlined">delete_sweep</span>
+              <span>Clear History (For Everyone)</span>
+            </button>
+            <button onclick="deleteConv()">
+              <span class="material-symbols-outlined">delete</span>
+              <span>Delete Chat (For Me)</span>
+            </button>
+            <button onclick="deleteConvEveryone()">
+              <span class="material-symbols-outlined">delete_forever</span>
+              <span>Delete Chat (For Everyone)</span>
+            </button>
+            <button onclick="blockUser()" id="block-btn" class="danger-btn">
+              <span class="material-symbols-outlined">block</span>
+              <span>Block User</span>
+            </button>
           </div>
         </div>
-      </div>
+      </header>
 
       <div class="msgs-box" id="msgs-box">
         <div id="msgs-inner"></div>
@@ -209,20 +470,268 @@
           <div class="rp-name" id="rp-name"></div>
           <div class="rp-text" id="rp-text"></div>
         </div>
-        <button class="ib" onclick="cancelReply()" style="margin-left:auto">✕</button>
+        <button class="ib" onclick="cancelReply()" style="margin-left:auto" title="Cancel Reply">
+          <span class="material-symbols-outlined">close</span>
+        </button>
       </div>
+
       <div class="input-area">
-        <button class="ib emoji-toggle" onclick="toggleEmoji()">😊</button>
-        <button class="ib" onclick="document.getElementById('img-input').click()" title="Send image">📷</button>
+        <button class="ib emoji-toggle" onclick="toggleEmoji()" title="Insert Emoji">
+          <span class="material-symbols-outlined">sentiment_satisfied</span>
+        </button>
+        <button class="ib attach-btn" onclick="document.getElementById('img-input').click()" title="Send Image">
+          <span class="material-symbols-outlined">attach_file</span>
+        </button>
         <input type="file" id="img-input" accept="image/*" class="hidden" onchange="uploadChatImg(event)">
         <div class="emoji-box hidden" id="emoji-box"></div>
         <div class="ta-wrap">
           <textarea id="msg-inp" rows="1" placeholder="Type a message…" onkeydown="onKey(event)" oninput="autoResize(this);detectLinkPreview(this.value)" onpaste="onMsgPaste(event)"></textarea>
         </div>
         <div id="link-preview-card" class="link-preview-card hidden"></div>
-        <button class="send-btn" onclick="sendMsg()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <button class="send-btn" onclick="sendMsg()" title="Send Message">
+          <span class="material-symbols-outlined">send</span>
         </button>
+      </div>
+    </div>
+
+    <!-- Calls Hub Stage (Shown when on Calls tab & no active full screen call) -->
+    <div class="calls-hub hidden" id="calls-hub">
+      <div class="calls-hub-inner">
+        <div class="calls-hub-badge">
+          <span class="pulse-dot"></span>
+          <span>Encrypted WebRTC Calling Engine</span>
+        </div>
+        <div class="calls-hub-icon-wrap">
+          <span class="material-symbols-outlined">call</span>
+        </div>
+        <h2>Obsidian <span>Call Studio</span></h2>
+        <p>Private, real-time voice and 1080p video calls with dual-engine signaling and end-to-end P2P encryption.</p>
+        
+        <div class="calls-hub-actions">
+          <button class="btn-primary" onclick="openStartCallModal('video')">
+            <span class="material-symbols-outlined">videocam</span>
+            <span>Start Video Call</span>
+          </button>
+          <button class="btn-secondary" onclick="openStartCallModal('voice')">
+            <span class="material-symbols-outlined">call</span>
+            <span>Start Voice Call</span>
+          </button>
+        </div>
+
+        <div class="calls-features-grid">
+          <div class="call-feature-item">
+            <div class="cf-icon text-tertiary">
+              <span class="material-symbols-outlined">lock</span>
+            </div>
+            <div>
+              <h4>P2P Encrypted</h4>
+              <p>Direct peer-to-peer streams with DTLS-SRTP encryption.</p>
+            </div>
+          </div>
+          <div class="call-feature-item">
+            <div class="cf-icon text-secondary">
+              <span class="material-symbols-outlined">present_to_all</span>
+            </div>
+            <div>
+              <h4>Screen Sharing</h4>
+              <p>Present windows or full monitors seamlessly.</p>
+            </div>
+          </div>
+          <div class="call-feature-item">
+            <div class="cf-icon text-primary">
+              <span class="material-symbols-outlined">picture_in_picture_alt</span>
+            </div>
+            <div>
+              <h4>Multitasking PiP</h4>
+              <p>Float the call into Picture-in-Picture to keep chatting.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Main Stage (Stitch chatwave_settings) -->
+    <div class="settings-stage hidden" id="settings-stage">
+      <header class="settings-stage-header">
+        <div class="settings-head-left">
+          <button class="ib settings-back-btn" onclick="showChatsTab()" title="Back to Chats" type="button">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="settings-stage-icon-wrap" id="settings-stage-icon-wrap">
+            <span class="material-symbols-outlined" id="settings-stage-icon">manage_accounts</span>
+          </div>
+          <div class="settings-stage-title-wrap">
+            <h2 id="settings-stage-title">Account &amp; Profile</h2>
+            <p id="settings-stage-desc">Manage your profile photo, display name, and contact information</p>
+          </div>
+        </div>
+      </header>
+
+      <div class="settings-stage-body" id="settings-stage-body">
+        <!-- Section: Account & Profile -->
+        <div class="settings-section" id="settings-sec-account">
+          <!-- Profile Hero Card -->
+          <div class="settings-card profile-hero-card">
+            <div class="pf-av-container">
+              <div class="pf-av" id="pf-av">?</div>
+              <label class="change-av-btn" for="av-input" title="Upload New Photo">
+                <span class="material-symbols-outlined">photo_camera</span>
+                <span>Change Photo</span>
+              </label>
+              <input type="file" id="av-input" accept="image/*" class="hidden" onchange="uploadAv(event)"/>
+            </div>
+            <div class="pf-fields-grid">
+              <div class="fg">
+                <label>Display Name</label>
+                <div class="iw">
+                  <span class="material-symbols-outlined iw-icon">badge</span>
+                  <input type="text" id="pf-name" placeholder="Your name"/>
+                </div>
+              </div>
+              <div class="fg">
+                <label>Status Message</label>
+                <div class="iw">
+                  <span class="material-symbols-outlined iw-icon">chat</span>
+                  <input type="text" id="pf-status" placeholder="Available ⚡" maxlength="100"/>
+                </div>
+              </div>
+              <div class="fg">
+                <label>Phone Number</label>
+                <div class="iw">
+                  <span class="material-symbols-outlined iw-icon">phone</span>
+                  <input type="tel" id="pf-phone" placeholder="+1 (555) 019-2834"/>
+                </div>
+              </div>
+              <div class="fg">
+                <label>Email Address</label>
+                <div class="pf-email-row">
+                  <span class="material-symbols-outlined" style="font-size:18px;color:var(--outline)">mail</span>
+                  <span id="pf-email">email@example.com</span>
+                  <span id="pf-verified" class="verified hidden">✓ Verified</span>
+                </div>
+              </div>
+            </div>
+            <div class="settings-card-actions">
+              <button class="btn-primary" onclick="saveProfile()" type="button">
+                <span class="material-symbols-outlined">save</span>
+                <span>Save Changes</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Danger Zone Card -->
+          <div class="settings-card danger-card">
+            <div class="card-head-simple">
+              <span class="material-symbols-outlined text-error">warning</span>
+              <div>
+                <h4 class="text-error">Danger Zone</h4>
+                <p>Deleting your account permanently removes your identity, profile, and message keys.</p>
+              </div>
+            </div>
+            <button class="btn-danger" onclick="deleteAccount()" type="button">
+              <span class="material-symbols-outlined">delete_forever</span>
+              <span>Delete Account Permanently</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section: Privacy & Security -->
+        <div class="settings-section hidden" id="settings-sec-privacy">
+          <!-- E2EE Card -->
+          <div class="settings-card e2ee-overview-card">
+            <div class="e2ee-shield-hero">
+              <div class="e2ee-shield-icon">
+                <span class="material-symbols-outlined">verified_user</span>
+              </div>
+              <div class="e2ee-shield-meta">
+                <h3>End-to-End Encryption</h3>
+                <p>Your messages and calls are secured with zero-knowledge DTLS-SRTP and WebCrypto AES-GCM-256. No one outside your chat—not even ChatWave—can intercept your conversations.</p>
+              </div>
+            </div>
+            <div class="settings-sub-actions">
+              <button class="btn-secondary" onclick="changeE2EEPin()" type="button">
+                <span class="material-symbols-outlined">key</span>
+                <span>Change Security PIN</span>
+              </button>
+              <button id="unlock-chats-btn" class="btn-primary hidden" onclick="forceUnlockKeys()" type="button">
+                <span class="material-symbols-outlined">lock_open</span>
+                <span>Unlock Messages Now</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-row-item">
+              <div>
+                <h4>Read Receipts</h4>
+                <p>Blue double-ticks show when contacts have opened and read your messages.</p>
+              </div>
+              <span class="badge-tertiary">Active</span>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-row-item">
+              <div>
+                <h4>Zero-Logs Policy</h4>
+                <p>ChatWave does not store plain text message content, IP telemetry, or unencrypted keys.</p>
+              </div>
+              <span class="badge-tertiary">Enforced</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Blocked Contacts -->
+        <div class="settings-section hidden" id="settings-sec-blocked">
+          <div class="settings-card">
+            <div class="card-head-simple">
+              <span class="material-symbols-outlined text-error">block</span>
+              <div>
+                <h4>Blocked Contacts</h4>
+                <p>Blocked contacts cannot call you or send you messages.</p>
+              </div>
+            </div>
+            <div id="settings-blocked-list" class="settings-blocked-list">
+              <p style="color:var(--outline);text-align:center;padding:18px 0">Loading blocked contacts…</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Notifications -->
+        <div class="settings-section hidden" id="settings-sec-notifications">
+          <div class="settings-card">
+            <div class="settings-row-toggle">
+              <div>
+                <h4>Message Audio Chimes</h4>
+                <p>Play subtle synthetic tone when new incoming messages arrive.</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="toggle-sound-chime" checked onchange="toggleSoundSetting(this.checked)"/>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-row-toggle">
+              <div>
+                <h4>Desktop Push Notifications</h4>
+                <p>Receive notifications on your device when ChatWave is running in the background.</p>
+              </div>
+              <button class="btn-secondary btn-sm" onclick="requestDesktopNotifPermission()" type="button">
+                <span class="material-symbols-outlined">notifications_active</span>
+                <span id="btn-notif-perm-label">Enable Notifications</span>
+              </button>
+            </div>
+            <div class="settings-divider"></div>
+            <div class="settings-row-toggle">
+              <div>
+                <h4>Test Notification Tone</h4>
+                <p>Preview ChatWave's incoming audio chime tone.</p>
+              </div>
+              <button class="btn-secondary btn-sm" onclick="playNotifSound()" type="button">
+                <span class="material-symbols-outlined">volume_up</span>
+                <span>Play Sound</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -231,204 +740,241 @@
 <!-- MODALS -->
 <div class="modal-ov hidden" id="new-chat-modal" onclick="maybeCloseModal(event,'new-chat-modal')">
   <div class="modal">
-    <div class="modal-head"><h3>New Conversation</h3><button onclick="closeModal('new-chat-modal')">✕</button></div>
+    <div class="modal-head">
+      <h3>New Conversation</h3>
+      <button onclick="closeModal('new-chat-modal')" title="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
     <div class="modal-body">
       <div class="fg">
         <label>Find user by Email</label>
-        <div class="iw"><span>🔍</span><input type="email" id="find-email" placeholder="friend@example.com" oninput="findUser(this.value)"/></div>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">search</span>
+          <input type="email" id="find-email" placeholder="friend@example.com" oninput="findUser(this.value)"/>
+        </div>
       </div>
       <div id="find-result"></div>
     </div>
   </div>
 </div>
 
-<div class="modal-ov hidden" id="profile-modal" onclick="maybeCloseModal(event,'profile-modal')">
+<!-- START CALL MODAL -->
+<div class="modal-ov hidden" id="start-call-modal" onclick="maybeCloseModal(event,'start-call-modal')">
   <div class="modal">
-    <div class="modal-head"><h3>Your Profile</h3><button onclick="closeModal('profile-modal')">✕</button></div>
+    <div class="modal-head">
+      <h3 id="start-call-modal-title">Start a Call</h3>
+      <button onclick="closeModal('start-call-modal')" title="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
     <div class="modal-body">
-      <div class="pf-av-section">
-        <div class="pf-av" id="pf-av">?</div>
-        <label class="change-av" for="av-input">Change Photo</label>
-        <input type="file" id="av-input" accept="image/*" class="hidden" onchange="uploadAv(event)"/>
-      </div>
-      <div class="fg"><label>Display Name</label><div class="iw"><span>👤</span><input type="text" id="pf-name" placeholder="Your name"/></div></div>
-      <div class="fg"><label>Status Message</label><div class="iw"><span>💬</span><input type="text" id="pf-status" placeholder="Hey there! I'm using ChatWave Ultra" maxlength="100"/></div></div>
-      <div class="fg"><label>Phone Number</label><div class="iw"><span>📱</span><input type="tel" id="pf-phone" placeholder="+1 234 567 8900"/></div></div>
-      <div class="pf-email-row">
-        <span>Email:</span>
-        <span id="pf-email"></span>
-        <span id="pf-verified" class="verified hidden">✓ Verified</span>
-      </div>
-      <div style="background:var(--bg3); padding:14px; border-radius:14px; margin-bottom:14px; border:1px solid var(--border);">
-        <div style="font-size:0.85rem; font-weight:700; margin-bottom:10px; color:var(--text); display:flex; align-items:center; gap:6px;">
-          <span>🔒</span> End-to-End Encryption
+      <div class="fg">
+        <label>Find Contact by Email</label>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">search</span>
+          <input type="email" id="call-find-email" placeholder="friend@example.com" oninput="findCallUser(this.value)"/>
         </div>
-        <button class="btn-secondary" onclick="changeE2EEPin()" style="width: 100%; padding:10px; font-size:0.85rem; margin-bottom: 8px;">Change Security PIN</button>
-        <button id="unlock-chats-btn" class="btn-primary hidden" onclick="forceUnlockKeys()" style="width: 100%; padding:10px; font-size:0.85rem; background: var(--pink); box-shadow: 0 4px 14px rgba(236,72,153,0.4);">Unlock Messages Now</button>
       </div>
-      <button class="btn-secondary" onclick="openBlockedModal()" style="margin-bottom:8px">🚫 Manage Blocked Users</button>
-      <button class="btn-primary" onclick="saveProfile()">Save Changes</button>
-      <button class="btn-danger" onclick="deleteAccount()">Delete Account</button>
+      <div id="call-find-result"></div>
+
+      <div class="quick-call-section" style="margin-top: 8px;">
+        <label style="font-family:var(--font-mono);font-size:0.72rem;color:var(--outline);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:8px;">Recent Contacts</label>
+        <div id="quick-contacts-list" class="quick-contacts-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;">
+          <!-- Dynamically populated from allConvs -->
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- Obsolete modal stubs for backward-compatible closeModal calls -->
+<div class="hidden" id="profile-modal"></div>
+
 <!-- Message context menu -->
 <div class="msg-ctx hidden" id="msg-ctx">
   <button id="msg-ctx-reply" onclick="ctxReply()">Reply</button>
-  <button id="msg-ctx-copy" onclick="ctxCopy()">Copy</button>
+  <button id="msg-ctx-copy" onclick="ctxCopy()">Copy Text</button>
   <button id="msg-ctx-delete" onclick="ctxDelete()" class="hidden">Delete</button>
 </div>
 
 <div id="toasts"></div>
 <div id="recaptcha-container"></div>
 
-<!-- BLOCKED USERS MODAL -->
-<div class="modal-ov hidden" id="blocked-modal" onclick="maybeCloseModal(event,'blocked-modal')">
-  <div class="modal">
-    <div class="modal-head"><h3>🚫 Blocked Users</h3><button onclick="closeModal('blocked-modal')">✕</button></div>
-    <div class="modal-body">
-      <div id="blocked-list"><p style="color:var(--text3);text-align:center;padding:16px 0">No blocked users.</p></div>
-    </div>
-  </div>
-</div>
+<div class="hidden" id="blocked-modal"></div>
 
-<div class="modal-ov hidden" id="pin-modal" style="z-index: 10000; backdrop-filter: blur(10px);">
-  <div class="modal" style="width: min(340px, 92vw); text-align: center; padding-bottom: 24px; border-top: 4px solid var(--p);">
-    <div class="modal-head" style="justify-content: center; padding-top: 28px; border-bottom: none;">
-      <div style="font-size: 3rem; margin-bottom: 8px; line-height: 1; filter: drop-shadow(0 0 10px rgba(124,58,237,0.5));">🔒</div>
+<div class="modal-ov hidden" id="pin-modal" style="z-index: 10000;">
+  <div class="modal" style="width: min(360px, 92vw); text-align: center; padding-bottom: 24px; border-top: 3px solid var(--primary);">
+    <div class="modal-head" style="justify-content: center; padding-top: 24px; border-bottom: none;">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--surface-container-high);display:grid;place-items:center;margin:0 auto 4px auto;box-shadow:0 0 20px rgba(79,70,229,0.3)">
+        <span class="material-symbols-outlined" style="font-size:28px;color:var(--primary)">lock</span>
+      </div>
     </div>
     <div class="modal-body" style="padding-top: 0;">
-      <h3 id="pin-title" style="font-family: 'Space Grotesk', sans-serif; font-size: 1.3rem; margin-bottom: 6px;">Enter E2EE PIN</h3>
-      <p id="pin-desc" style="color: var(--text2); font-size: 0.85rem; margin-bottom: 20px;">Unlock your encrypted messages.</p>
+      <h3 id="pin-title" style="font-family: var(--font-headline); font-size: 1.25rem; font-weight: 700; margin-bottom: 4px;">Enter E2EE PIN</h3>
+      <p id="pin-desc" style="color: var(--on-surface-variant); font-size: 0.82rem; margin-bottom: 18px;">Unlock your encrypted messages.</p>
       
-      <div class="iw" style="margin-bottom: 20px; border-radius: 16px; background: rgba(0,0,0,0.2);">
-        <span style="padding-left: 16px; font-size: 1.2rem;">🔑</span>
-        <input type="password" id="pin-input" placeholder="••••••" maxlength="6" inputmode="numeric" style="text-align: center; letter-spacing: 8px; font-size: 1.6rem; font-weight: 700; padding: 16px 0;" />
+      <div class="iw" style="margin-bottom: 18px; border-radius: var(--radius-sm); background: var(--surface-container);">
+        <span class="material-symbols-outlined iw-icon">key</span>
+        <input type="password" id="pin-input" placeholder="••••••" maxlength="6" inputmode="numeric" style="text-align: center; letter-spacing: 8px; font-size: 1.5rem; font-weight: 700; padding: 14px 0;" />
       </div>
       
       <div style="display: flex; gap: 10px;">
-        <button class="btn-secondary" id="pin-cancel" style="flex: 1; border-radius: 12px;">Cancel</button>
-        <button class="btn-primary" id="pin-submit" style="flex: 1; border-radius: 12px;">Confirm</button>
+        <button class="btn-secondary" id="pin-cancel" style="flex: 1; border-radius: var(--radius-sm);">Cancel</button>
+        <button class="btn-primary" id="pin-submit" style="flex: 1; border-radius: var(--radius-sm);">Confirm</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- INCOMING CALL MODAL -->
-<div class="incoming-call-modal hidden" id="incoming-call-modal">
-  <div class="incoming-call-card">
-    <div class="incoming-call-glow"></div>
-    <div class="incoming-call-avatar-wrap">
-      <div class="incoming-call-ripple"></div>
-      <div class="incoming-call-ripple delayed"></div>
-      <div class="incoming-call-avatar" id="inc-caller-av">?</div>
-    </div>
-    <div class="incoming-call-details">
-      <h3 id="inc-caller-name">Incoming Call</h3>
-      <div class="incoming-call-type">
-        <span class="material-symbols-outlined" id="inc-type-icon">videocam</span>
-        <span id="inc-type-text">Incoming Video Call...</span>
+<!-- NEXCALL CALL OVERLAYS (INCOMING & OUTGOING) -->
+<div id="call-overlay" class="overlay hidden">
+  <!-- Outgoing Call Card -->
+  <div id="outgoing-call-card" class="call-card hidden">
+    <div class="avatar-ring-container">
+      <div class="pulse-ring"></div>
+      <div class="pulse-ring delay-1"></div>
+      <div class="call-avatar" id="outgoing-call-avatar">
+        <span id="outgoing-avatar-letter">?</span>
+        <img id="outgoing-avatar-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;">
       </div>
     </div>
-    <div class="incoming-call-actions">
-      <button class="call-action-btn decline" id="inc-btn-decline" onclick="declineIncomingCall()" title="Decline">
-        <span class="material-symbols-outlined">call_end</span>
-        <span>Decline</span>
-      </button>
-      <button class="call-action-btn accept" id="inc-btn-accept" onclick="acceptIncomingCall()" title="Accept">
-        <span class="material-symbols-outlined" id="inc-accept-icon">call</span>
-        <span>Accept</span>
-      </button>
+    <h2 class="call-title">Calling</h2>
+    <p id="outgoing-callee-name" class="call-user-name">User Name</p>
+    <p id="outgoing-callee-email" class="call-user-email"></p>
+    <div class="e2ee-tag-wrap">
+      <div class="e2ee-tag">
+        <span class="material-symbols-outlined text-sm text-tertiary">lock</span>
+        <span>End-to-End Encrypted</span>
+      </div>
     </div>
+    <p class="call-status">Ringing...</p>
+    <button id="btn-cancel-call" class="btn-call-danger" title="Cancel Call">
+      <span class="material-symbols-outlined">call_end</span>
+    </button>
   </div>
-</div>
 
-<!-- ACTIVE CALL OVERLAY / SCREEN -->
-<div class="call-screen hidden" id="call-screen">
-  <div class="call-viewport" id="call-viewport">
-    <!-- Remote Video Element -->
-    <video id="remote-video" class="remote-video" autoplay playsinline></video>
-    
-    <!-- Audio-Only Call Fallback / Active Speaker View -->
-    <div class="audio-call-fallback hidden" id="audio-call-fallback">
-      <div class="audio-avatar-wrapper">
-        <div class="audio-wave-ring r1"></div>
-        <div class="audio-wave-ring r2"></div>
-        <div class="audio-wave-ring r3"></div>
-        <div class="audio-call-avatar" id="call-peer-av">?</div>
-      </div>
-      <h2 class="audio-peer-name" id="call-peer-name">—</h2>
-      <p class="audio-call-status" id="call-status-label">Calling...</p>
-    </div>
-
-    <!-- Gradient overlay for controls contrast -->
-    <div class="call-gradient-overlay"></div>
-
-    <!-- Top Bar: Remote Peer Info Pill + E2EE Badge + Fullscreen & Minimize -->
-    <div class="call-top-bar">
-      <div class="call-peer-pill">
-        <div class="call-status-dot" id="call-status-dot"></div>
-        <div class="call-peer-meta">
-          <span class="call-peer-title" id="call-header-name">Sarah Lin</span>
-          <span class="call-timer-badge" id="call-duration-timer">00:00</span>
-        </div>
-      </div>
-
-      <div class="call-top-right">
-        <div class="call-e2ee-badge">
-          <span class="material-symbols-outlined">lock</span>
-          <span>End-to-end encrypted</span>
-        </div>
-        <button class="call-icon-btn" id="call-btn-minimize" title="Minimize / Chat" onclick="toggleCallMinimize()">
-          <span class="material-symbols-outlined" id="call-minimize-icon">branding_watermark</span>
-        </button>
-        <button class="call-icon-btn" id="call-btn-fullscreen" title="Toggle Fullscreen" onclick="toggleCallFullscreen()">
-          <span class="material-symbols-outlined" id="call-fullscreen-icon">fullscreen</span>
-        </button>
+  <!-- Incoming Call Card -->
+  <div id="incoming-call-card" class="call-card hidden">
+    <div class="avatar-ring-container">
+      <div class="pulse-ring incoming-pulse"></div>
+      <div class="pulse-ring incoming-pulse delay-1"></div>
+      <div class="call-avatar incoming-avatar" id="incoming-call-avatar">
+        <span id="incoming-avatar-letter">?</span>
+        <img id="incoming-avatar-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;">
       </div>
     </div>
-
-    <!-- Floating Picture-in-Picture Local Video (Bottom-Right) -->
-    <div class="call-pip-container" id="call-pip-container">
-      <video id="local-video" class="local-video" autoplay playsinline muted></video>
-      <div class="pip-label">You</div>
-      <div class="pip-cam-off-placeholder hidden" id="pip-cam-off">
-        <span class="material-symbols-outlined">videocam_off</span>
+    <h2 class="call-title">Incoming Call</h2>
+    <p id="incoming-caller-name" class="call-user-name">User Name</p>
+    <p id="incoming-caller-email" class="call-user-email"></p>
+    <div class="e2ee-tag-wrap">
+      <div class="e2ee-tag">
+        <span class="material-symbols-outlined text-sm text-tertiary">lock</span>
+        <span>End-to-End Encrypted</span>
       </div>
     </div>
-
-    <!-- Floating Glassmorphic Pill Dock Controls (Bottom-Center) -->
-    <div class="call-controls-dock" id="call-controls-dock">
-      <!-- Mute Mic -->
-      <button class="call-dock-btn" id="call-btn-mic" title="Mute Microphone" onclick="toggleCallMic()">
-        <span class="material-symbols-outlined" id="call-mic-icon">mic</span>
-      </button>
-
-      <!-- Toggle Camera -->
-      <button class="call-dock-btn" id="call-btn-cam" title="Turn Off Camera" onclick="toggleCallCam()">
-        <span class="material-symbols-outlined" id="call-cam-icon">videocam</span>
-      </button>
-
-      <!-- Toggle Speaker / Remote Audio -->
-      <button class="call-dock-btn" id="call-btn-speaker" title="Speaker / Mute Audio" onclick="toggleCallSpeaker()">
-        <span class="material-symbols-outlined" id="call-speaker-icon">volume_up</span>
-      </button>
-
-      <!-- Chat during call -->
-      <button class="call-dock-btn" id="call-btn-chat" title="Chat during call" onclick="toggleCallMinimize()">
-        <span class="material-symbols-outlined">chat</span>
-      </button>
-
-      <div class="call-dock-divider"></div>
-
-      <!-- End Call -->
-      <button class="call-dock-btn end-call" id="call-btn-end" title="End Call" onclick="endCall('User ended call')">
+    <p class="call-status">Wants to connect...</p>
+    <div class="call-actions">
+      <button id="btn-decline-call" class="btn-call-danger" title="Decline">
         <span class="material-symbols-outlined">call_end</span>
       </button>
+      <button id="btn-accept-call" class="btn-call-success btn-pulse-green" title="Accept">
+        <span class="material-symbols-outlined">call</span>
+      </button>
     </div>
   </div>
 </div>
+
+<!-- ACTIVE CALL ROOM VIEW (Obsidian Wave Studio) -->
+<div id="call-room-view" class="call-room hidden">
+  <div class="video-container">
+    <!-- Remote Video feed (Full screen background) -->
+    <div class="remote-video-wrap">
+      <video id="remote-video" autoplay playsinline class="remote-video-feed"></video>
+      <div class="remote-video-overlay"></div>
+    </div>
+
+    <!-- Top Call Room Header -->
+    <header class="call-room-header">
+      <div class="call-partner-pill">
+        <div class="pulse-dot"></div>
+        <div class="call-partner-meta">
+          <span id="call-partner-name" class="partner-name">Connecting...</span>
+          <span class="call-duration" id="call-duration-timer">00:00</span>
+        </div>
+      </div>
+      <div class="call-header-right">
+        <div class="call-e2ee-badge" title="DTLS-SRTP 256-bit Encrypted Call">
+          <span class="material-symbols-outlined text-xs text-tertiary">lock</span>
+          <span>End-to-End Encrypted</span>
+        </div>
+        <button id="btn-call-fullscreen" class="call-header-btn" onclick="toggleCallFullscreen()" title="Toggle Fullscreen" type="button">
+          <span class="material-symbols-outlined">fullscreen</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Voice Call Center Stage (Shown for audio-only calls or when remote camera is off) -->
+    <div id="voice-call-avatar-container" class="voice-call-stage hidden">
+      <div class="voice-avatar-orb">
+        <div class="pulse-ring voice-ring-1"></div>
+        <div class="pulse-ring voice-ring-2"></div>
+        <div class="voice-call-avatar" id="voice-call-avatar-ring">
+          <span id="voice-avatar-letter">?</span>
+          <img id="voice-avatar-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;">
+        </div>
+      </div>
+      <div id="voice-call-partner-name" class="voice-partner-name">Partner Name</div>
+      <div class="voice-call-status-badge">
+        <span class="material-symbols-outlined text-xs text-tertiary">lock</span>
+        <span>Secure Audio Stream Active</span>
+      </div>
+    </div>
+
+    <!-- Floating Picture-in-Picture Card (Local feed) -->
+    <div class="local-video-card" id="local-video-container">
+      <video id="local-video" autoplay playsinline muted></video>
+      <div class="local-video-label">You</div>
+    </div>
+
+    <!-- Floating Obsidian Controls Bar -->
+    <div class="controls-bar-wrap">
+      <div class="controls-bar">
+        <!-- Mic Toggle -->
+        <button id="btn-toggle-audio" class="control-btn" title="Toggle Microphone" type="button">
+          <span class="material-symbols-outlined icon-mic">mic</span>
+          <span class="material-symbols-outlined icon-mic-off hidden">mic_off</span>
+        </button>
+
+        <!-- Camera Toggle -->
+        <button id="btn-toggle-video" class="control-btn" title="Toggle Camera" type="button">
+          <span class="material-symbols-outlined icon-video">videocam</span>
+          <span class="material-symbols-outlined icon-video-off hidden">videocam_off</span>
+        </button>
+
+        <!-- Screen Share -->
+        <button id="btn-share-screen" class="control-btn" title="Share Screen" type="button">
+          <span class="material-symbols-outlined">present_to_all</span>
+        </button>
+
+        <!-- Minimize / Chat PiP -->
+        <button id="btn-minimize-call" class="control-btn" title="Chat during call / Minimize" type="button">
+          <span class="material-symbols-outlined">chat</span>
+        </button>
+
+        <div class="control-divider"></div>
+
+        <!-- End Call -->
+        <button id="btn-hangup" class="control-btn btn-call-danger" title="End Call" type="button">
+          <span class="material-symbols-outlined">call_end</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RINGTONE AUDIO -->
+<audio id="audio-ringing" loop preload="auto" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-84.wav"></audio>
 
 <script type="module" src="app.js"></script>
 </body>

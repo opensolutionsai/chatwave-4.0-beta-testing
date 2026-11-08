@@ -2,42 +2,176 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users: any logged-in user can read profiles, only owner can write
-    match /users/{uid} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+    // ===============================================================
+    // Assumed Data Models
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid} (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required) - Firebase Auth user ID
+    //   - name: string (optional) - Display name
+    //   - email: string (optional) - User email address
+    //   - photoURL: string (optional) - Profile photo URL
+    //   - phone: string (optional) - Phone number
+    //   - publicKey: map/string (optional) - E2EE public key
+    //   - encryptedPrivKey: string (optional) - Encrypted private key backup
+    //   - blockedUsers: list of strings (optional) - List of blocked UIDs
+    //   - createdAt: timestamp (optional)
+    //
+    // Collection: conversations
+    // Document ID: {convId}
+    // Fields:
+    //   - participants: list of strings (required) - Array of UIDs in conversation
+    //   - lastMsg: string (optional)
+    //   - updatedAt: timestamp (optional)
+    //   - hiddenUI: map (optional) - Per-user visibility flags
+    //   - cleared: map (optional) - Per-user clear history timestamps
+    //   - unread: map (optional) - Per-user unread counts
+    //
+    // Subcollection: conversations/{convId}/messages
+    // Document ID: {msgId}
+    // Fields:
+    //   - senderId: string (required) - UID of sender
+    //   - text: string (optional) - Plaintext or encrypted message payload
+    //   - createdAt: timestamp (optional)
+    //   - encrypted: bool (optional)
+    //   - replyTo: map (optional)
+    //   - image: string (optional)
+    //
+    // Collection: calls
+    // Document ID: {callId}
+    // Fields:
+    //   - callId: string (required) - Call session ID
+    //   - callerId: string (required, immutable) - UID of caller
+    //   - callerName: string (optional) - Display name of caller
+    //   - callerEmail: string (optional)
+    //   - callerPhotoURL: string (optional)
+    //   - calleeId: string (required, immutable) - UID of target peer
+    //   - calleeName: string (optional)
+    //   - calleeEmail: string (optional)
+    //   - offer: map (required, immutable) - WebRTC SDP offer { sdp: string, type: 'offer' }
+    //   - answer: map (optional) - WebRTC SDP answer { sdp: string, type: 'answer' }
+    //   - status: string (required) - 'ringing' | 'accepted' | 'declined' | 'ended'
+    //   - callType: string (required, immutable) - 'voice' | 'video'
+    //   - duration: number (optional) - Call duration in seconds
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Conversations
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isCallParticipant(data) {
+      return isAuthenticated() &&
+        (request.auth.uid == data.callerId || request.auth.uid == data.calleeId);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // 1. Users collection
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(uid);
+    }
+
+    // 2. Conversations collection
     match /conversations/{convId} {
-      // Allow read only if you are a participant
-      allow read: if request.auth != null
+      allow read: if isAuthenticated()
                   && resource != null
                   && request.auth.uid in resource.data.participants;
 
-      // Allow create if you include yourself in participants
-      allow create: if request.auth != null
+      allow create: if isAuthenticated()
                     && request.auth.uid in request.resource.data.participants;
 
-      // Allow update/delete if you are an existing participant
-      allow update, delete: if request.auth != null
+      allow update, delete: if isAuthenticated()
                     && resource != null
                     && request.auth.uid in resource.data.participants;
 
       // Messages sub-collection
       match /messages/{msgId} {
-        // Any authenticated user can read messages in a conversation they know
-        allow read: if request.auth != null;
+        allow read: if isAuthenticated();
 
-        // Only the sender can create a message
-        allow create: if request.auth != null
-                      && request.auth.uid == request.resource.data.senderId;
+        allow create: if isAuthenticated() &&
+                      (request.auth.uid == request.resource.data.senderId ||
+                       (request.resource.data.type == "call" &&
+                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants));
 
-        // Only the original sender can delete their own message
-        allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+        allow update: if isAuthenticated() &&
+                      resource != null &&
+                      resource.data.type == "call" &&
+                      request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants;
 
-        allow update: if false; // messages are immutable; read receipts live in RTDB
+        allow delete: if isAuthenticated() &&
+                      (request.auth.uid == resource.data.senderId ||
+                       (resource.data.type == "call" &&
+                        request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.participants));
       }
+    }
+
+    // 3. WebRTC Calls collection
+    match /calls/{callId} {
+      // READ: Only caller or callee can view / listen to their calls.
+      // This also safely authorizes:
+      // query(collection(db, "calls"), where("calleeId", "==", auth.uid), where("status", "==", "ringing"))
+      allow read: if isAuthenticated() &&
+                     resource != null &&
+                     isCallParticipant(resource.data);
+
+      // CREATE: Initiated only by the authenticated caller with initial 'ringing' state
+      allow create: if isAuthenticated() &&
+                      request.resource.data.callerId == request.auth.uid &&
+                      request.resource.data.calleeId is string &&
+                      request.resource.data.calleeId != request.auth.uid &&
+                      request.resource.data.status == "ringing" &&
+                      request.resource.data.callType in ["voice", "video"] &&
+                      request.resource.data.offer is map &&
+                      request.resource.data.offer.type == "offer" &&
+                      request.resource.data.offer.sdp is string;
+
+      // UPDATE: Lifecycle updates (accept, decline, end)
+      allow update: if isAuthenticated() &&
+                      resource != null &&
+                      isCallParticipant(resource.data) &&
+                      // Core immutable fields: caller, callee, original offer, callType must not change
+                      request.resource.data.callerId == resource.data.callerId &&
+                      request.resource.data.calleeId == resource.data.calleeId &&
+                      request.resource.data.callType == resource.data.callType &&
+                      request.resource.data.offer.sdp == resource.data.offer.sdp &&
+                      request.resource.data.offer.type == resource.data.offer.type &&
+                      // Status must be one of the recognized states
+                      request.resource.data.status in ["ringing", "accepted", "declined", "ended"] &&
+                      // Valid state transition logic
+                      (
+                        // Acceptance by callee (with valid answer SDP)
+                        (resource.data.status == "ringing" &&
+                         request.resource.data.status == "accepted" &&
+                         request.auth.uid == resource.data.calleeId &&
+                         request.resource.data.answer is map &&
+                         request.resource.data.answer.type == "answer" &&
+                         request.resource.data.answer.sdp is string) ||
+                        // Rejection / Decline by callee
+                        (resource.data.status == "ringing" &&
+                         request.resource.data.status == "declined" &&
+                         request.auth.uid == resource.data.calleeId) ||
+                        // Terminate / Cancel by either participant
+                        (request.resource.data.status == "ended")
+                      );
+
+      // DELETE: Either participant can clean up terminated call records
+      allow delete: if isAuthenticated() &&
+                      resource != null &&
+                      isCallParticipant(resource.data);
     }
   }
 }

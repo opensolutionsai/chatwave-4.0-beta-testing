@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User profile rules
+    match /users/{userId} {
+      allow read, write: if request.auth != null;
+      
+      // Subcollection for contacts
+      match /contacts/{contactId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Subcollection for blocked users
+      match /blocked/{blockedId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Call rules
+    match /calls/{callId} {
+      allow read: if request.auth != null;
+      allow update, delete: if request.auth != null;
+      
+      // Prevent call creation if the caller is blocked by the callee
+      allow create: if request.auth != null && !exists(/databases/$(database)/documents/users/$(request.resource.data.calleeId)/blocked/$(request.auth.uid));
+      
+      // Candidates subcollection
+      match /callerCandidates/{candidateId} {
+        allow read, write: if request.auth != null;
+      }
+      match /calleeCandidates/{candidateId} {
+        allow read, write: if request.auth != null;
+      }
+      
+      // Chat subcollection
+      match /chat/{chatId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+  }
+}
