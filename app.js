@@ -51,6 +51,7 @@ initWebRTC({ db, supabase });
 // ── STATE ──
 let currentUser = null;
 let currentConvId = null;
+let currentConv = null;
 let currentPeer = null;
 let unsubMsgs = null;
 let unsubConvs = null;
@@ -552,7 +553,7 @@ function startSupabasePresence() {
   });
 
   const onPresenceUpdate = () => {
-    if (currentPeer) {
+    if (currentPeer && currentPeer.id && !currentPeer.isGroup) {
       syncPeerPresenceState(currentPeer.id);
     }
   };
@@ -568,7 +569,7 @@ function startSupabasePresence() {
           await trackOnline();
           await reportPresenceDb(true);
         }
-        if (currentPeer) {
+        if (currentPeer && currentPeer.id && !currentPeer.isGroup) {
           syncPeerPresenceState(currentPeer.id);
         }
       }
@@ -601,7 +602,7 @@ function handleTabActive() {
     reportPresenceDb(true);
   }
 
-  if (currentPeer) {
+  if (currentPeer && currentPeer.id && !currentPeer.isGroup) {
     syncPeerPresenceState(currentPeer.id);
   }
 }
@@ -720,7 +721,7 @@ onAuthStateChanged(auth, async (user) => {
         if (unsubConvs) { unsubConvs(); unsubConvs = null; }
         listenConversations();
         // Close the currently open chat if the peer was just blocked
-        if (currentPeer && myBlockedUsers.includes(currentPeer.id)) {
+        if (currentPeer && currentPeer.id && !currentPeer.isGroup && myBlockedUsers.includes(currentPeer.id)) {
           closeChat();
           toast('Chat closed — you blocked this user.', 'info');
         }
@@ -967,10 +968,15 @@ function listenConversations() {
         }
         continue;
       }
-      const peerId = data.participants?.find(p => p !== currentUser.uid);
-      if (peerId && myBlockedUsers.includes(peerId)) continue; // ── block filter
+      
+      // Block filter only applies to 1:1 direct chats
+      if (!data.isGroup) {
+        const peerId = data.participants?.find(p => p !== currentUser.uid);
+        if (peerId && myBlockedUsers.includes(peerId)) continue; // ── block filter
+      }
       
       if (currentConvId === data.id) {
+        currentConv = data;
         const newClearedAt = data.cleared?.[currentUser.uid] || null;
         const oldMs = myClearedAt?.toMillis?.() || 0;
         const newMs = newClearedAt?.toMillis?.() || 0;
@@ -985,21 +991,30 @@ function listenConversations() {
       allConvs.push(data);
     }
     
-    // Zero-Cost Blue Ticks: Live sync without reloading DOM
-    if (currentConvId) {
+    // Zero-Cost Blue Ticks: Live sync without reloading DOM (1:1 only)
+    if (currentConvId && (!currentConv || !currentConv.isGroup)) {
       updateBlueTicks(currentConvId);
     }
 
     // Pre-fetch peers in parallel to preserve order and prevent race conditions
     const renderItems = await Promise.all(validDocs.map(async conv => {
-      const peerId = conv.participants.find(p => p !== currentUser.uid);
+      if (conv.isGroup) {
+        const peer = {
+          name: conv.groupName || "Group Chat",
+          photoURL: conv.groupPhotoURL || "",
+          isGroup: true
+        };
+        return { conv, peerId: null, peer };
+      }
+
+      const peerId = conv.participants?.find(p => p !== currentUser.uid);
       if (!peerId) return null;
       
       // Fetch user profile from cache (or Firestore if not cached)
       const cached = await fetchUserCached(peerId);
       const peer = cached 
-          ? { name: cached.name, photoURL: cached.photoURL } 
-          : { name: "Unknown", photoURL: "" };
+          ? { name: cached.name, photoURL: cached.photoURL, isGroup: false } 
+          : { name: "Unknown", photoURL: "", isGroup: false };
       
       return { conv, peerId, peer };
     }));
@@ -1073,24 +1088,41 @@ function updateBlueTicks(convId) {
 
 function renderConvItemSync(conv, peerId, peer, container) {
   const item = document.createElement("div");
-  item.className = `conv-item${conv.id === currentConvId ? " active" : ""}`;
+  const isGroup = !!(conv.isGroup || peer.isGroup);
+  item.className = `conv-item${conv.id === currentConvId ? " active" : ""}${isGroup ? " group-conv-item" : ""}`;
   item.id = `conv-${conv.id}`;
-  item.onclick = () => openChat(conv.id, peerId, peer);
+  item.dataset.isGroup = isGroup ? "true" : "false";
+  item.onclick = () => openChat(conv.id, peerId, peer, conv);
   const unread = (conv.unread || {})[currentUser.uid] || 0;
   
-  // Pull status message from our Firestore cache!
-  const statusMsg = usersCache.get(peerId)?.statusMsg || "Available";
+  if (isGroup) {
+    const memberCount = (conv.participants || []).length;
+    const subText = conv.groupDesc || `${memberCount} members`;
+    item.innerHTML = `
+      <div class="av group-av"><span class="material-symbols-outlined group-glyph">groups</span></div>
+      <div class="conv-meta">
+        <div class="conv-name">${esc(conv.groupName || peer.name)}</div>
+        <div class="conv-last">${esc(subText)}</div>
+      </div>
+      <div class="conv-right">
+        <span class="conv-time">${esc(fmtTime(conv.lastAt))}</span>
+        ${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ""}
+      </div>`;
+  } else {
+    // Pull status message from our Firestore cache!
+    const statusMsg = usersCache.get(peerId)?.statusMsg || "Available";
 
-  item.innerHTML = `
-    <div class="av">${peer.photoURL ? `<img src="${esc(peer.photoURL)}"/>` : esc(initials(peer.name))}</div>
-    <div class="conv-meta">
-      <div class="conv-name">${esc(peer.name)}</div>
-      <div class="conv-last">${esc(statusMsg)}</div> 
-    </div>
-    <div class="conv-right">
-      <span class="conv-time">${esc(fmtTime(conv.lastAt))}</span>
-      ${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ""}
-    </div>`;
+    item.innerHTML = `
+      <div class="av">${peer.photoURL ? `<img src="${esc(peer.photoURL)}"/>` : esc(initials(peer.name))}</div>
+      <div class="conv-meta">
+        <div class="conv-name">${esc(peer.name)}</div>
+        <div class="conv-last">${esc(statusMsg)}</div> 
+      </div>
+      <div class="conv-right">
+        <span class="conv-time">${esc(fmtTime(conv.lastAt))}</span>
+        ${unread > 0 ? `<span class="unread-badge">${unread}</span>` : ""}
+      </div>`;
+  }
   container.appendChild(item);
 }
 
@@ -1114,6 +1146,7 @@ function applyConvFilters(searchVal) {
   document.querySelectorAll(".conv-item").forEach(el => {
     const name = el.querySelector(".conv-name")?.textContent.toLowerCase() || "";
     const hasUnread = !!el.querySelector(".unread-badge");
+    const isGroup = el.dataset.isGroup === "true";
     const matchesSearch = name.includes(searchVal);
 
     if (!matchesSearch) {
@@ -1123,6 +1156,8 @@ function applyConvFilters(searchVal) {
 
     if (activeConvFilter === "unread") {
       el.style.display = hasUnread ? "" : "none";
+    } else if (activeConvFilter === "groups") {
+      el.style.display = isGroup ? "" : "none";
     } else {
       el.style.display = "";
     }
@@ -1283,70 +1318,130 @@ function listenPeerSupabasePresence(peerId) {
 }
 
 // ── CHAT ──
-window.openChat = async (convId, peerId, peer) => {
-  // Guard: you (the current user) blocked this person — you cannot open their chat
-  // This is one-directional: if THEY blocked YOU, your side is completely unaffected
-  if (myBlockedUsers.includes(peerId)) {
-    toast('You blocked this user. Unblock them first to chat.', 'err');
-    return;
+window.openChat = async (convId, peerId, peer, convObj) => {
+  const convData = convObj || allConvs.find(c => c.id === convId);
+  const isGroup = !!(convData?.isGroup || peer?.isGroup || (!peerId && !peer?.id));
+
+  if (!isGroup) {
+    // Guard: you (the current user) blocked this person — you cannot open their chat
+    if (myBlockedUsers.includes(peerId)) {
+      toast('You blocked this user. Unblock them first to chat.', 'err');
+      return;
+    }
   }
+
   currentConvId = convId;
-  currentPeer = { id: peerId, ...peer };
-  
-  // Fetch peer info from cache (or Firestore if needed)
-  const peerData = await fetchUserCached(peerId);
-  if (peerData) {
-    currentPeer = { id: peerId, ...peer, ...peerData };
+  currentConv = convData || null;
+
+  if (unsubPeerPresence) {
+    unsubPeerPresence();
+    unsubPeerPresence = null;
   }
 
-  // ── SHADOW BLOCK: check if the peer has blocked ME ──
-  amIBlocked = (peerData?.blockedUsers || []).includes(currentUser.uid);
-  
-  if (peerData && peerData.publicKey) {
-      currentSharedKey = await deriveSharedKey(peerData.publicKey);
+  // Toggle call buttons for group vs 1:1
+  const btnVoice = document.getElementById("btn-voice-call");
+  const btnVideo = document.getElementById("btn-video-call");
+  if (btnVoice) btnVoice.classList.toggle("hidden", isGroup);
+  if (btnVideo) btnVideo.classList.toggle("hidden", isGroup);
+
+  if (isGroup) {
+    currentPeer = {
+      id: null,
+      isGroup: true,
+      name: convData?.groupName || peer?.name || "Group",
+      photoURL: convData?.groupPhotoURL || ""
+    };
+    currentSharedKey = null;
+    amIBlocked = false;
+
+    document.getElementById("welcome").classList.add("hidden");
+    document.getElementById("chat-view").classList.remove("hidden");
+    document.getElementById("peer-name").textContent = currentPeer.name;
+
+    const memberCount = (convData?.participants || []).length;
+    const peerStatusEl = document.getElementById("peer-status");
+    if (peerStatusEl) {
+      peerStatusEl.textContent = `${memberCount} members • Tap for group info`;
+      peerStatusEl.className = "peer-status";
+    }
+
+    const peerAv = document.getElementById("peer-av");
+    if (peerAv) {
+      peerAv.className = "av group-av";
+      peerAv.innerHTML = `<span class="material-symbols-outlined group-glyph">groups</span>`;
+    }
   } else {
-      currentSharedKey = null; // Peer is using an old account without E2EE
+    currentPeer = { id: peerId, ...peer, isGroup: false };
+    
+    // Fetch peer info from cache (or Firestore if needed)
+    const peerData = await fetchUserCached(peerId);
+    if (peerData) {
+      currentPeer = { id: peerId, ...peer, ...peerData, isGroup: false };
+    }
+
+    // ── SHADOW BLOCK: check if the peer has blocked ME ──
+    amIBlocked = (peerData?.blockedUsers || []).includes(currentUser.uid);
+    
+    if (peerData && peerData.publicKey) {
+        currentSharedKey = await deriveSharedKey(peerData.publicKey);
+    } else {
+        currentSharedKey = null; // Peer is using an old account without E2EE
+    }
+
+    document.getElementById("welcome").classList.add("hidden");
+    document.getElementById("chat-view").classList.remove("hidden");
+    document.getElementById("peer-name").textContent = peer.name;
+    const peerAv = document.getElementById("peer-av");
+    if (peerAv) {
+      peerAv.className = "av";
+      avatarEl(peerAv, peer.name, peer.photoURL);
+    }
   }
 
-  document.getElementById("welcome").classList.add("hidden");
-  document.getElementById("chat-view").classList.remove("hidden");
-  document.getElementById("peer-name").textContent = peer.name;
-  avatarEl(document.getElementById("peer-av"), peer.name, peer.photoURL);
   document.querySelectorAll(".conv-item").forEach(el => el.classList.remove("active"));
   document.getElementById(`conv-${convId}`)?.classList.add("active");
-  // Reset unread badge in Firestore
-  
+
   // ── Soft-delete: read my personal clearedAt for this conversation ──
   const convSnap = await getDoc(doc(db, "conversations", convId));
-  myClearedAt = convSnap.exists() ? (convSnap.data().cleared?.[currentUser.uid] || null) : null;
-  
-  if (!amIBlocked) {
-    if (unsubPeerPresence) {
-      unsubPeerPresence();
-      unsubPeerPresence = null;
-    }
-    const unsubPresence = listenPeerSupabasePresence(peerId);
-    const unsubPeerDoc = onSnapshot(doc(db, "users", peerId), (snap) => {
-      const data = snap.data();
-      if (!data) return;
-      usersCache.set(peerId, data);
-      document.getElementById("peer-name").textContent = data.name || "Unknown";
-      avatarEl(document.getElementById("peer-av"), data.name, data.photoURL);
-      const isNowBlocked = (data.blockedUsers || []).includes(currentUser.uid);
-      if (isNowBlocked !== amIBlocked) {
-        amIBlocked = isNowBlocked;
-        if (amIBlocked) renderPeerPresenceUI(false, null);
-      }
-    });
-    unsubPeerPresence = () => {
-      if (unsubPresence) unsubPresence();
-      unsubPeerDoc();
-    };
-  } else {
-    // Shadow-blocked: show forced offline
-    if (unsubPeerPresence) { unsubPeerPresence(); unsubPeerPresence = null; }
-    renderPeerPresenceUI(false, null);
+  if (convSnap.exists()) {
+    currentConv = { id: convSnap.id, ...convSnap.data() };
+    myClearedAt = currentConv.cleared?.[currentUser.uid] || null;
   }
+
+  // Clear unread badge in Firestore for current user
+  updateDoc(doc(db, "conversations", convId), {
+    [`unread.${currentUser.uid}`]: 0
+  }).catch(() => {});
+
+  if (!isGroup) {
+    if (!amIBlocked) {
+      const unsubPresence = listenPeerSupabasePresence(peerId);
+      const unsubPeerDoc = onSnapshot(doc(db, "users", peerId), (snap) => {
+        const data = snap.data();
+        if (!data) return;
+        usersCache.set(peerId, data);
+        document.getElementById("peer-name").textContent = data.name || "Unknown";
+        const peerAv = document.getElementById("peer-av");
+        if (peerAv) {
+          peerAv.className = "av";
+          avatarEl(peerAv, data.name, data.photoURL);
+        }
+        const isNowBlocked = (data.blockedUsers || []).includes(currentUser.uid);
+        if (isNowBlocked !== amIBlocked) {
+          amIBlocked = isNowBlocked;
+          if (amIBlocked) renderPeerPresenceUI(false, null);
+        }
+      });
+      unsubPeerPresence = () => {
+        if (unsubPresence) unsubPresence();
+        unsubPeerDoc();
+      };
+    } else {
+      // Shadow-blocked: show forced offline
+      renderPeerPresenceUI(false, null);
+    }
+  }
+
   listenMessages(convId);
   document.getElementById("sidebar").classList.add("slide-out");
   document.getElementById("msg-inp").focus();
@@ -1359,9 +1454,15 @@ window.closeChat = () => {
   if (unsubMsgs) { unsubMsgs(); unsubMsgs = null; }
   if (unsubPeerPresence) { unsubPeerPresence(); unsubPeerPresence = null; }
   currentConvId = null;
+  currentConv = null;
   currentPeer = null;
   myClearedAt = null;
   document.querySelectorAll(".conv-item").forEach(el => el.classList.remove("active"));
+  // Reset call button visibility
+  const btnVoice = document.getElementById("btn-voice-call");
+  const btnVideo = document.getElementById("btn-video-call");
+  if (btnVoice) btnVoice.classList.remove("hidden");
+  if (btnVideo) btnVideo.classList.remove("hidden");
 };
 
 function listenMessages(convId) {
@@ -1483,7 +1584,20 @@ function buildMsgEl(msg) {
     return buildCallMsgEl(msg);
   }
 
+  // 👈 GROUP SYSTEM MESSAGE: Render clean centered info pill
+  if (msg.type === "system") {
+    const row = document.createElement("div");
+    row.className = "msg-system-row";
+    row.dataset.id = msg.id;
+    const pill = document.createElement("div");
+    pill.className = "msg-system-pill";
+    pill.innerHTML = `<span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px;">info</span>${esc(msg.text || "")}`;
+    row.appendChild(pill);
+    return row;
+  }
+
   const isMe = msg.senderId === currentUser.uid;
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
   const row = document.createElement("div");
   row.className = `msg-row ${isMe ? "me" : "them"}`;
   row.dataset.id = msg.id;
@@ -1493,12 +1607,22 @@ function buildMsgEl(msg) {
   if (!isMe) {
     const av = document.createElement("div");
     av.className = "av msg-av";
-    av.innerHTML = currentPeer?.photoURL ? `<img src="${esc(currentPeer.photoURL)}"/>` : esc(initials(currentPeer?.name || "?"));
+    const sName = msg.senderName || currentPeer?.name || "?";
+    const sPhoto = msg.senderPhotoURL || (isGroup ? "" : currentPeer?.photoURL);
+    av.innerHTML = sPhoto ? `<img src="${esc(sPhoto)}"/>` : esc(initials(sName));
     row.appendChild(av);
   }
   
   const bubble = document.createElement("div");
   bubble.className = "msg-bubble";
+
+  // Group sender label for messages from other members
+  if (isGroup && !isMe) {
+    const senderLabel = document.createElement("div");
+    senderLabel.className = "msg-group-sender-name";
+    senderLabel.textContent = msg.senderName || "Member";
+    bubble.appendChild(senderLabel);
+  }
 
   // 1. Render Reply Snippet securely
   if (msg.replyTo) {
@@ -1650,7 +1774,8 @@ window.ctxReply = () => {
   document.getElementById("msg-ctx").classList.add("hidden");
   
   const isMe = ctxMsgData.senderId === currentUser.uid;
-  const senderName = isMe ? "You" : (currentPeer?.name || "User");
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
+  const senderName = isMe ? "You" : (isGroup ? (ctxMsgData.senderName || "Member") : (currentPeer?.name || "User"));
   let previewText = ctxMsgData.text || (ctxMsgData.image ? "📷 Photo" : "Attachment");
   
   replyingTo = {
@@ -1686,7 +1811,9 @@ window.sendMsg = async (customText, imgUrl) => {
   if (!text && !imgUrl) return;          // must have text OR image
   if (!currentConvId || !currentPeer) return;
   if (!imgUrl) { inp.value = ""; autoResize(inp); }
-  const isE2EE = !!currentSharedKey;
+  
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
+  const isE2EE = !isGroup && !!currentSharedKey;
 
   // Build message document
   const msgData = {
@@ -1695,6 +1822,11 @@ window.sendMsg = async (customText, imgUrl) => {
     encrypted: isE2EE,
     ...(imgUrl ? { image: imgUrl } : {})
   };
+
+  if (isGroup) {
+    msgData.senderName = currentUser.displayName || currentUser.email?.split("@")[0] || "User";
+    msgData.senderPhotoURL = currentUser.photoURL || "";
+  }
 
   // Encrypt the reply snippet
   if (replyingTo) {
@@ -1722,7 +1854,7 @@ window.sendMsg = async (customText, imgUrl) => {
     if (isE2EE) {
       msgData.text = await encryptText(text, currentSharedKey);
     } else {
-      msgData.text = text; // Fallback for non-E2EE accounts
+      msgData.text = text; // Fallback for non-E2EE accounts & group chats
     }
   } else {
     msgData.text = "";
@@ -1730,16 +1862,32 @@ window.sendMsg = async (customText, imgUrl) => {
 
   await addDoc(collection(db, "conversations", currentConvId, "messages"), msgData);
   if (!imgUrl) clearLinkPreview();
-  // Shadow-block: skip conversation doc update if peer has blocked me
-  if (!amIBlocked) {
-    // 👈 REMOVED lastMsg here to save massive Firestore writes
-    await updateDoc(doc(db, "conversations", currentConvId), {
+
+  if (isGroup) {
+    const participants = currentConv?.participants || [];
+    const updatePayload = {
       lastAt: serverTimestamp(),
-      [`unread.${currentPeer.id}`]: increment(1),
       [`unread.${currentUser.uid}`]: 0,
-      [`hiddenUI.${currentUser.uid}`]: false,
-      [`hiddenUI.${currentPeer.id}`]: false
-    });
+      [`hiddenUI.${currentUser.uid}`]: false
+    };
+    for (const pUid of participants) {
+      if (pUid !== currentUser.uid) {
+        updatePayload[`unread.${pUid}`] = increment(1);
+        updatePayload[`hiddenUI.${pUid}`] = false;
+      }
+    }
+    await updateDoc(doc(db, "conversations", currentConvId), updatePayload).catch(console.warn);
+  } else {
+    // Shadow-block: skip conversation doc update if peer has blocked me
+    if (!amIBlocked) {
+      await updateDoc(doc(db, "conversations", currentConvId), {
+        lastAt: serverTimestamp(),
+        [`unread.${currentPeer.id}`]: increment(1),
+        [`unread.${currentUser.uid}`]: 0,
+        [`hiddenUI.${currentUser.uid}`]: false,
+        [`hiddenUI.${currentPeer.id}`]: false
+      }).catch(console.warn);
+    }
   }
   cancelReply();
 };
@@ -1750,6 +1898,7 @@ window.uploadChatImg = async (e) => {
   if (!file || !currentConvId || !currentPeer) return;
   // Reset input so same file can be re-selected
   e.target.value = "";
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
   // Show spinner inside the message area
   const inner = document.getElementById("msgs-inner");
   const indicator = document.createElement("div");
@@ -1771,7 +1920,7 @@ window.uploadChatImg = async (e) => {
     const secure_url = json.secure_url;
     indicator.remove();
     let finalUrl = secure_url;
-    if (currentSharedKey) {
+    if (!isGroup && currentSharedKey) {
         finalUrl = await encryptText(secure_url, currentSharedKey);
     }
     await sendMsg(null, finalUrl);
@@ -1892,7 +2041,20 @@ window.ctxDelete = async () => {
 };
 
 // ── CHAT MENU ──
-window.toggleChatMenu = () => document.getElementById("chat-ctx-menu").classList.toggle("hidden");
+window.toggleChatMenu = () => {
+  const menu = document.getElementById("chat-ctx-menu");
+  if (!menu) return;
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
+  const blockBtn = document.getElementById("block-btn");
+  const groupInfoBtn = document.getElementById("btn-ctx-group-info");
+  const leaveGroupBtn = document.getElementById("btn-ctx-leave-group");
+
+  if (blockBtn) blockBtn.classList.toggle("hidden", isGroup);
+  if (groupInfoBtn) groupInfoBtn.classList.toggle("hidden", !isGroup);
+  if (leaveGroupBtn) leaveGroupBtn.classList.toggle("hidden", !isGroup);
+
+  menu.classList.toggle("hidden");
+};
 document.addEventListener("click", (e) => { if (!e.target.closest("#chat-ctx-menu") && !e.target.closest("#chat-menu-btn")) document.getElementById("chat-ctx-menu")?.classList.add("hidden"); });
 
 // ── BLOCK USER ──
@@ -1965,16 +2127,26 @@ window.clearChat = async () => {
 window.clearChatEveryone = async () => {
   document.getElementById("chat-ctx-menu").classList.add("hidden");
   if (!currentConvId || !currentPeer) return;
-  if (!confirm("Clear chat history for EVERYONE? Both of you will lose the messages.")) return;
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
+  if (!confirm("Clear chat history for EVERYONE? All members will lose the messages.")) return;
   try {
     const nowTs = Timestamp.now();
-    await updateDoc(doc(db, "conversations", currentConvId), {
-      [`cleared.${currentUser.uid}`]: nowTs,
-      [`cleared.${currentPeer.id}`]: nowTs,
-      [`unread.${currentUser.uid}`]: 0,
-      [`unread.${currentPeer.id}`]: 0,
+    const updatePayload = {
       lastMsg: "Chat cleared"
-    });
+    };
+    if (isGroup) {
+      const participants = currentConv?.participants || [];
+      participants.forEach(p => {
+        updatePayload[`cleared.${p}`] = nowTs;
+        updatePayload[`unread.${p}`] = 0;
+      });
+    } else {
+      updatePayload[`cleared.${currentUser.uid}`] = nowTs;
+      updatePayload[`cleared.${currentPeer.id}`] = nowTs;
+      updatePayload[`unread.${currentUser.uid}`] = 0;
+      updatePayload[`unread.${currentPeer.id}`] = 0;
+    }
+    await updateDoc(doc(db, "conversations", currentConvId), updatePayload);
     myClearedAt = nowTs;
     listenMessages(currentConvId);
     toast("Chat cleared for everyone ✓", "ok");
@@ -2008,21 +2180,39 @@ window.deleteConv = async () => {
 window.deleteConvEveryone = async () => {
   document.getElementById("chat-ctx-menu").classList.add("hidden");
   if (!currentConvId || !currentPeer) return;
-  if (!confirm("Delete this conversation for EVERYONE? It will be removed from both of your lists.")) return;
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
+  if (isGroup) {
+    const isAdmin = (currentConv?.admins || []).includes(currentUser.uid) || currentConv?.createdBy === currentUser.uid;
+    if (!isAdmin) {
+      toast("Only a group admin can delete the group for everyone.", "err");
+      return;
+    }
+    if (!confirm("Permanently delete this group for EVERYONE?")) return;
+  } else {
+    if (!confirm("Delete this conversation for EVERYONE? It will be removed from both of your lists.")) return;
+  }
   const convIdToDelete = currentConvId;
-  const peerId = currentPeer.id;
   try {
     const nowTs = Timestamp.now();
     closeChat(); // stop listeners
-    await updateDoc(doc(db, "conversations", convIdToDelete), {
-      [`hiddenUI.${currentUser.uid}`]: true,
-      [`hiddenUI.${peerId}`]: true,
-      [`cleared.${currentUser.uid}`]: nowTs,
-      [`cleared.${peerId}`]: nowTs,
-      [`unread.${currentUser.uid}`]: 0,
-      [`unread.${peerId}`]: 0,
-      lastMsg: "Chat deleted"
-    });
+    const updatePayload = {
+      lastMsg: isGroup ? "Group deleted by admin" : "Chat deleted"
+    };
+    if (isGroup) {
+      (currentConv?.participants || []).forEach(p => {
+        updatePayload[`hiddenUI.${p}`] = true;
+        updatePayload[`cleared.${p}`] = nowTs;
+        updatePayload[`unread.${p}`] = 0;
+      });
+    } else {
+      updatePayload[`hiddenUI.${currentUser.uid}`] = true;
+      updatePayload[`hiddenUI.${currentPeer.id}`] = true;
+      updatePayload[`cleared.${currentUser.uid}`] = nowTs;
+      updatePayload[`cleared.${currentPeer.id}`] = nowTs;
+      updatePayload[`unread.${currentUser.uid}`] = 0;
+      updatePayload[`unread.${currentPeer.id}`] = 0;
+    }
+    await updateDoc(doc(db, "conversations", convIdToDelete), updatePayload);
     toast("Conversation deleted for everyone ✓", "ok");
   } catch (err) {
     console.error("deleteConvEveryone error:", err);
@@ -2238,6 +2428,10 @@ function setCallAvatarUI(type, name, photoURL) {
 
 // ── INITIATE OUTGOING CALL ──
 window.startCall = async function(callType = "video") {
+  if (currentPeer?.isGroup || currentConv?.isGroup) {
+    toast("Group calls coming soon! WebRTC is 1:1 only.", "info");
+    return;
+  }
   if (!currentPeer || !currentPeer.id) {
     toast("Open a chat first to start a call", "err");
     return;
@@ -3262,5 +3456,496 @@ window.toggleCallFullscreen = function() {
     } else if (document.webkitExitFullscreen) {
       document.webkitExitFullscreen();
     }
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// ── GROUP CHATS MANAGEMENT ──
+// ═══════════════════════════════════════════════════════
+let newGroupSelectedMembers = new Map();
+
+function populateRecentContactsForGroup() {
+  const container = document.getElementById("new-group-recent-contacts");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const contacts = [];
+  const seenUids = new Set([currentUser.uid]);
+
+  for (const c of allConvs) {
+    if (c.isGroup) continue;
+    const peerId = (c.participants || []).find(p => p !== currentUser.uid);
+    if (!peerId || seenUids.has(peerId) || myBlockedUsers.includes(peerId)) continue;
+    seenUids.add(peerId);
+    const cached = usersCache.get(peerId);
+    contacts.push({
+      uid: peerId,
+      name: cached?.name || "User",
+      email: cached?.email || "",
+      photoURL: cached?.photoURL || ""
+    });
+  }
+
+  if (contacts.length === 0) {
+    container.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:8px 0;text-align:center;">No recent contacts. Use the search bar above.</div>`;
+    return;
+  }
+
+  contacts.forEach(u => {
+    const isAdded = newGroupSelectedMembers.has(u.uid);
+    const item = document.createElement("div");
+    item.className = "group-contact-pick-item";
+    item.id = `pick-contact-${u.uid}`;
+    item.innerHTML = `
+      <div class="av" style="width:34px;height:34px;font-size:.8rem;">
+        ${u.photoURL ? `<img src="${esc(u.photoURL)}"/>` : esc(initials(u.name))}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:.85rem;color:var(--text);">${esc(u.name)}</div>
+        <div style="font-size:.76rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(u.email || "")}</div>
+      </div>
+      <button type="button" class="btn-pick ${isAdded ? 'picked' : ''}" style="padding:4px 10px;font-size:.78rem;border-radius:var(--radius-sm);cursor:pointer;" onclick="toggleGroupCandidateFromPick('${u.uid}', '${esc(u.name)}', '${esc(u.email)}', '${esc(u.photoURL)}')">
+        ${isAdded ? 'Added ✓' : '+ Add'}
+      </button>
+    `;
+    container.appendChild(item);
+  });
+}
+
+window.toggleGroupCandidateFromPick = (uid, name, email, photoURL) => {
+  if (newGroupSelectedMembers.has(uid)) {
+    window.removeGroupMemberCandidate(uid);
+  } else {
+    window.addGroupMemberCandidate(uid, name, email, photoURL);
+  }
+};
+
+function renderNewGroupChips() {
+  const container = document.getElementById("new-group-selected-chips");
+  const countEl = document.getElementById("new-group-member-count");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (countEl) countEl.textContent = newGroupSelectedMembers.size;
+
+  newGroupSelectedMembers.forEach((member, uid) => {
+    const isMe = uid === currentUser.uid;
+    const chip = document.createElement("div");
+    chip.className = "member-chip";
+    chip.innerHTML = `
+      <span>${esc(member.name)}${isMe ? " (You)" : ""}</span>
+      ${!isMe ? `<button type="button" onclick="removeGroupMemberCandidate('${uid}')" title="Remove">&times;</button>` : ""}
+    `;
+    container.appendChild(chip);
+  });
+
+  // Update pick buttons in recent contacts
+  document.querySelectorAll(".group-contact-pick-item").forEach(item => {
+    const uid = item.id.replace("pick-contact-", "");
+    const btn = item.querySelector("button");
+    if (btn) {
+      const isAdded = newGroupSelectedMembers.has(uid);
+      btn.className = `btn-pick ${isAdded ? 'picked' : ''}`;
+      btn.textContent = isAdded ? 'Added ✓' : '+ Add';
+    }
+  });
+}
+
+window.openNewGroupModal = () => {
+  closeModal('new-chat-modal');
+  
+  const nameInp = document.getElementById("new-group-name");
+  const descInp = document.getElementById("new-group-desc");
+  const searchInp = document.getElementById("new-group-search-email");
+  const searchRes = document.getElementById("new-group-search-result");
+  if (nameInp) nameInp.value = "";
+  if (descInp) descInp.value = "";
+  if (searchInp) searchInp.value = "";
+  if (searchRes) searchRes.innerHTML = "";
+
+  newGroupSelectedMembers.clear();
+  newGroupSelectedMembers.set(currentUser.uid, {
+    uid: currentUser.uid,
+    name: currentUser.displayName || currentUser.email?.split("@")[0] || "You",
+    email: currentUser.email || "",
+    photoURL: currentUser.photoURL || ""
+  });
+
+  renderNewGroupChips();
+  populateRecentContactsForGroup();
+  openModal('new-group-modal');
+  setTimeout(() => nameInp?.focus(), 150);
+};
+
+let searchGroupCandidateTimer = null;
+window.searchGroupMemberCandidate = (val) => {
+  clearTimeout(searchGroupCandidateTimer);
+  const res = document.getElementById("new-group-search-result");
+  if (!val || val.length < 3) { res.innerHTML = ""; return; }
+  searchGroupCandidateTimer = setTimeout(async () => {
+    res.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:6px 0;">Searching...</div>`;
+    try {
+      const q = query(collection(db, "users"), where("email", "==", val.trim().toLowerCase()), limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        res.innerHTML = `<div class="uc-notfound">No user found with that email.</div>`;
+        return;
+      }
+      const u = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      if (u.id === currentUser.uid) {
+        res.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:6px 0;">That's you! You are already added as admin.</div>`;
+        return;
+      }
+      if (newGroupSelectedMembers.has(u.id)) {
+        res.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:6px 0;">Already added</div>`;
+        return;
+      }
+      res.innerHTML = `
+        <div class="group-contact-pick-item" style="margin-top:6px;">
+          <div class="av" style="width:32px;height:32px;font-size:.78rem;">
+            ${u.photoURL ? `<img src="${esc(u.photoURL)}"/>` : esc(initials(u.name || "?"))}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:.86rem;color:var(--text);">${esc(u.name || "User")}</div>
+            <div style="font-size:.76rem;color:var(--text3);">${esc(u.email || "")}</div>
+          </div>
+          <button type="button" class="btn-primary" style="padding:4px 10px;font-size:.78rem;" onclick="addGroupMemberCandidate('${u.id}', '${esc(u.name || "User")}', '${esc(u.email || "")}', '${esc(u.photoURL || "")}')">Add</button>
+        </div>
+      `;
+    } catch (e) {
+      res.innerHTML = `<div class="uc-notfound">Error searching user: ${esc(e.message)}</div>`;
+    }
+  }, 300);
+};
+
+window.addGroupMemberCandidate = (uid, name, email, photoURL) => {
+  newGroupSelectedMembers.set(uid, { uid, name, email, photoURL });
+  const searchInp = document.getElementById("new-group-search-email");
+  const searchRes = document.getElementById("new-group-search-result");
+  if (searchInp) searchInp.value = "";
+  if (searchRes) searchRes.innerHTML = "";
+  renderNewGroupChips();
+};
+
+window.removeGroupMemberCandidate = (uid) => {
+  if (uid === currentUser.uid) return;
+  newGroupSelectedMembers.delete(uid);
+  renderNewGroupChips();
+};
+
+window.createGroupChat = async () => {
+  const nameInp = document.getElementById("new-group-name");
+  const descInp = document.getElementById("new-group-desc");
+  const btn = document.getElementById("btn-submit-create-group");
+
+  const name = nameInp?.value?.trim();
+  const desc = descInp?.value?.trim() || "";
+
+  if (!name) {
+    toast("Please enter a group name", "err");
+    nameInp?.focus();
+    return;
+  }
+  if (newGroupSelectedMembers.size < 2) {
+    toast("Please add at least 1 other member to the group", "err");
+    return;
+  }
+
+  const prevText = btn?.innerHTML;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spin" style="width:16px;height:16px;border-width:2px;display:inline-block;margin-right:6px;"></div>Creating...`;
+  }
+
+  try {
+    const participantIds = Array.from(newGroupSelectedMembers.keys());
+    const unreadMap = {};
+    const hiddenUIMap = {};
+    participantIds.forEach(id => {
+      unreadMap[id] = 0;
+      hiddenUIMap[id] = false;
+    });
+
+    const newGroupDoc = {
+      isGroup: true,
+      groupName: name,
+      groupDesc: desc,
+      createdBy: currentUser.uid,
+      admins: [currentUser.uid],
+      participants: participantIds,
+      unread: unreadMap,
+      hiddenUI: hiddenUIMap,
+      lastAt: serverTimestamp(),
+      lastMsg: `${currentUser.displayName || "Admin"} created group "${name}"`
+    };
+
+    const docRef = await addDoc(collection(db, "conversations"), newGroupDoc);
+
+    // Initial system message
+    await addDoc(collection(db, "conversations", docRef.id, "messages"), {
+      type: "system",
+      text: `${currentUser.displayName || "Admin"} created group "${name}"`,
+      senderId: currentUser.uid,
+      createdAt: serverTimestamp()
+    });
+
+    closeModal("new-group-modal");
+    toast(`Group "${name}" created!`, "ok");
+
+    openChat(docRef.id, null, { name: name, isGroup: true, photoURL: "" }, {
+      id: docRef.id,
+      ...newGroupDoc
+    });
+  } catch (err) {
+    console.error("createGroupChat error:", err);
+    toast("Failed to create group: " + err.message, "err");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = prevText;
+    }
+  }
+};
+
+window.handleChatHeaderClick = () => {
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
+  if (isGroup) {
+    window.openGroupInfoModal();
+  }
+};
+
+window.openGroupInfoModal = async () => {
+  if (!currentConvId) return;
+  const convSnap = await getDoc(doc(db, "conversations", currentConvId));
+  if (!convSnap.exists()) return;
+  currentConv = { id: convSnap.id, ...convSnap.data() };
+
+  const nameEl = document.getElementById("group-info-name");
+  const descEl = document.getElementById("group-info-desc");
+  const subEl = document.getElementById("group-info-created-sub");
+  const countEl = document.getElementById("group-members-label");
+  const listEl = document.getElementById("group-members-list");
+  const addInp = document.getElementById("group-add-member-inp");
+  const addRes = document.getElementById("group-add-member-result");
+  const btnDeleteAll = document.getElementById("btn-group-delete-all");
+
+  if (nameEl) nameEl.textContent = currentConv.groupName || "Group";
+  if (descEl) descEl.textContent = currentConv.groupDesc || "No description provided.";
+
+  const creatorUid = currentConv.createdBy;
+  const creatorCached = creatorUid ? await fetchUserCached(creatorUid) : null;
+  const creatorName = creatorUid === currentUser.uid ? "you" : (creatorCached?.name || "admin");
+  if (subEl) subEl.textContent = `Created by ${creatorName} • ${fmtDate(currentConv.lastAt)}`;
+
+  const participants = currentConv.participants || [];
+  const admins = currentConv.admins || [creatorUid];
+  const amIAdmin = admins.includes(currentUser.uid) || creatorUid === currentUser.uid;
+
+  if (btnDeleteAll) {
+    btnDeleteAll.classList.toggle("hidden", !amIAdmin);
+  }
+
+  if (countEl) countEl.textContent = `Members (${participants.length})`;
+  if (addInp) addInp.value = "";
+  if (addRes) addRes.innerHTML = "";
+  if (listEl) listEl.innerHTML = `<div style="text-align:center;padding:12px;color:var(--text3);font-size:.82rem;">Loading members...</div>`;
+
+  openModal("group-info-modal");
+
+  const memberProfiles = await Promise.all(participants.map(async uid => {
+    const u = await fetchUserCached(uid);
+    return {
+      uid,
+      name: u?.name || "User",
+      email: u?.email || "",
+      photoURL: u?.photoURL || "",
+      isAdmin: admins.includes(uid) || uid === creatorUid,
+      isMe: uid === currentUser.uid
+    };
+  }));
+
+  memberProfiles.sort((a, b) => {
+    if (a.isMe) return -1;
+    if (b.isMe) return 1;
+    if (a.isAdmin && !b.isAdmin) return -1;
+    if (!a.isAdmin && b.isAdmin) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  if (listEl) {
+    listEl.innerHTML = "";
+    memberProfiles.forEach(m => {
+      const item = document.createElement("div");
+      item.className = "group-member-item";
+      item.innerHTML = `
+        <div class="av" style="width:36px;height:36px;font-size:.82rem;">
+          ${m.photoURL ? `<img src="${esc(m.photoURL)}"/>` : esc(initials(m.name))}
+        </div>
+        <div class="group-member-meta">
+          <div class="group-member-name">
+            ${esc(m.name)} ${m.isMe ? '<span style="color:var(--text3);font-size:.76rem;font-weight:500;">(You)</span>' : ''}
+          </div>
+          <div class="group-member-sub">
+            ${m.isAdmin ? '<span class="admin-badge">Admin</span>' : '<span style="color:var(--text3);font-size:.76rem;">Member</span>'}
+          </div>
+        </div>
+        ${(amIAdmin && !m.isMe) ? `
+          <button class="member-remove-btn" title="Remove ${esc(m.name)}" onclick="removeMemberFromGroup('${m.uid}', '${esc(m.name)}')">
+            <span class="material-symbols-outlined">person_remove</span>
+          </button>
+        ` : ''}
+      `;
+      listEl.appendChild(item);
+    });
+  }
+};
+
+let searchAddMemberTimer = null;
+window.searchGroupAddMemberCandidate = (val) => {
+  clearTimeout(searchAddMemberTimer);
+  const res = document.getElementById("group-add-member-result");
+  if (!val || val.length < 3) { res.innerHTML = ""; return; }
+  searchAddMemberTimer = setTimeout(async () => {
+    res.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:6px 0;">Searching...</div>`;
+    try {
+      const q = query(collection(db, "users"), where("email", "==", val.trim().toLowerCase()), limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        res.innerHTML = `<div class="uc-notfound">No user found with that email.</div>`;
+        return;
+      }
+      const u = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      if ((currentConv?.participants || []).includes(u.id)) {
+        res.innerHTML = `<div style="color:var(--text3);font-size:.82rem;padding:6px 0;">Already a member of this group</div>`;
+        return;
+      }
+      res.innerHTML = `
+        <div class="group-contact-pick-item" style="margin-top:6px;">
+          <div class="av" style="width:32px;height:32px;font-size:.78rem;">
+            ${u.photoURL ? `<img src="${esc(u.photoURL)}"/>` : esc(initials(u.name || "?"))}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:.86rem;color:var(--text);">${esc(u.name || "User")}</div>
+            <div style="font-size:.76rem;color:var(--text3);">${esc(u.email || "")}</div>
+          </div>
+          <button type="button" class="btn-primary" style="padding:4px 10px;font-size:.78rem;" onclick="addMemberToExistingGroup('${u.id}', '${esc(u.name || "User")}')">Add to Group</button>
+        </div>
+      `;
+    } catch (e) {
+      res.innerHTML = `<div class="uc-notfound">Error searching user: ${esc(e.message)}</div>`;
+    }
+  }, 300);
+};
+
+window.addMemberToExistingGroup = async (uid, name) => {
+  if (!currentConvId) return;
+  try {
+    await updateDoc(doc(db, "conversations", currentConvId), {
+      participants: arrayUnion(uid),
+      [`unread.${uid}`]: 0,
+      [`hiddenUI.${uid}`]: false
+    });
+
+    await addDoc(collection(db, "conversations", currentConvId, "messages"), {
+      type: "system",
+      text: `${currentUser.displayName || "Admin"} added ${name}`,
+      senderId: currentUser.uid,
+      createdAt: serverTimestamp()
+    });
+
+    toast(`${name} added to group ✓`, "ok");
+    const inp = document.getElementById("group-add-member-inp");
+    const res = document.getElementById("group-add-member-result");
+    if (inp) inp.value = "";
+    if (res) res.innerHTML = "";
+
+    openGroupInfoModal();
+  } catch (err) {
+    console.error("addMemberToExistingGroup error:", err);
+    toast("Failed to add member: " + err.message, "err");
+  }
+};
+
+window.removeMemberFromGroup = async (uid, name) => {
+  if (!currentConvId) return;
+  if (!confirm(`Remove ${name} from this group?`)) return;
+  try {
+    await updateDoc(doc(db, "conversations", currentConvId), {
+      participants: arrayRemove(uid)
+    });
+
+    await addDoc(collection(db, "conversations", currentConvId, "messages"), {
+      type: "system",
+      text: `${currentUser.displayName || "Admin"} removed ${name}`,
+      senderId: currentUser.uid,
+      createdAt: serverTimestamp()
+    });
+
+    toast(`${name} removed from group`, "ok");
+    openGroupInfoModal();
+  } catch (err) {
+    console.error("removeMemberFromGroup error:", err);
+    toast("Failed to remove member: " + err.message, "err");
+  }
+};
+
+window.leaveCurrentGroup = async () => {
+  if (!currentConvId || !currentConv) return;
+  const groupName = currentConv.groupName || "this group";
+  if (!confirm(`Are you sure you want to leave "${groupName}"?`)) return;
+  try {
+    const convId = currentConvId;
+    closeModal("group-info-modal");
+    document.getElementById("chat-ctx-menu")?.classList.add("hidden");
+
+    await updateDoc(doc(db, "conversations", convId), {
+      participants: arrayRemove(currentUser.uid),
+      [`hiddenUI.${currentUser.uid}`]: true
+    });
+
+    await addDoc(collection(db, "conversations", convId, "messages"), {
+      type: "system",
+      text: `${currentUser.displayName || "A member"} left the group`,
+      senderId: currentUser.uid,
+      createdAt: serverTimestamp()
+    });
+
+    closeChat();
+    toast(`You left "${groupName}"`, "info");
+  } catch (err) {
+    console.error("leaveCurrentGroup error:", err);
+    toast("Failed to leave group: " + err.message, "err");
+  }
+};
+
+window.deleteCurrentGroup = async () => {
+  if (!currentConvId || !currentConv) return;
+  const isAdmin = (currentConv.admins || []).includes(currentUser.uid) || currentConv.createdBy === currentUser.uid;
+  if (!isAdmin) {
+    toast("Only a group admin can delete the group for everyone", "err");
+    return;
+  }
+  if (!confirm(`Permanently delete group "${currentConv.groupName}" for all members? This action cannot be undone.`)) return;
+
+  try {
+    const convId = currentConvId;
+    closeModal("group-info-modal");
+    document.getElementById("chat-ctx-menu")?.classList.add("hidden");
+
+    const nowTs = Timestamp.now();
+    const updatePayload = {
+      lastMsg: "Group deleted by admin"
+    };
+    (currentConv.participants || []).forEach(p => {
+      updatePayload[`hiddenUI.${p}`] = true;
+      updatePayload[`cleared.${p}`] = nowTs;
+    });
+
+    closeChat();
+    await updateDoc(doc(db, "conversations", convId), updatePayload);
+    toast("Group deleted for everyone ✓", "ok");
+  } catch (err) {
+    console.error("deleteCurrentGroup error:", err);
+    toast("Failed to delete group: " + err.message, "err");
   }
 };

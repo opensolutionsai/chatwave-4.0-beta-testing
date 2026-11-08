@@ -190,6 +190,9 @@
         <button class="ib" title="New Chat" onclick="openModal('new-chat-modal')">
           <span class="material-symbols-outlined">edit_square</span>
         </button>
+        <button class="ib" title="New Group" onclick="openNewGroupModal()">
+          <span class="material-symbols-outlined">group_add</span>
+        </button>
         <button class="ib" title="Settings" onclick="showSettingsTab()">
           <span class="material-symbols-outlined">settings</span>
         </button>
@@ -211,6 +214,7 @@
           <span>Unread</span>
           <span class="pill-badge hidden" id="unread-pill-badge">0</span>
         </button>
+        <button type="button" class="pill" id="filter-groups" onclick="setConvFilter('groups')">Groups</button>
       </div>
     </div>
 
@@ -417,7 +421,7 @@
         <button class="ib back-btn" onclick="closeChat()" title="Back">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
-        <div class="peer-info">
+        <div class="peer-info" id="peer-info-header" onclick="handleChatHeaderClick()" title="View details">
           <div class="av peer-av" id="peer-av">?</div>
           <div class="peer-text">
             <span class="peer-name" id="peer-name">—</span>
@@ -436,19 +440,27 @@
             <span class="material-symbols-outlined">more_vert</span>
           </button>
           <div class="chat-ctx-menu hidden" id="chat-ctx-menu">
+            <button onclick="handleChatHeaderClick()" id="btn-ctx-group-info" class="hidden">
+              <span class="material-symbols-outlined">info</span>
+              <span>Group Info</span>
+            </button>
             <button onclick="clearChat()">
               <span class="material-symbols-outlined">cleaning_services</span>
               <span>Clear History (For Me)</span>
             </button>
-            <button onclick="clearChatEveryone()">
+            <button onclick="clearChatEveryone()" id="btn-ctx-clear-everyone">
               <span class="material-symbols-outlined">delete_sweep</span>
               <span>Clear History (For Everyone)</span>
             </button>
-            <button onclick="deleteConv()">
+            <button onclick="deleteConv()" id="btn-ctx-delete-conv">
               <span class="material-symbols-outlined">delete</span>
               <span>Delete Chat (For Me)</span>
             </button>
-            <button onclick="deleteConvEveryone()">
+            <button onclick="leaveCurrentGroup()" id="btn-ctx-leave-group" class="danger-btn hidden">
+              <span class="material-symbols-outlined">logout</span>
+              <span>Leave Group</span>
+            </button>
+            <button onclick="deleteConvEveryone()" id="btn-ctx-delete-everyone">
               <span class="material-symbols-outlined">delete_forever</span>
               <span>Delete Chat (For Everyone)</span>
             </button>
@@ -747,6 +759,22 @@
       </button>
     </div>
     <div class="modal-body">
+      <!-- Quick Group Trigger Card -->
+      <button type="button" class="group-create-trigger-card" onclick="closeModal('new-chat-modal'); openNewGroupModal();">
+        <div class="gct-icon">
+          <span class="material-symbols-outlined">group_add</span>
+        </div>
+        <div class="gct-meta">
+          <span class="gct-title">New Group</span>
+          <span class="gct-sub">Create a group chat with multiple contacts</span>
+        </div>
+        <span class="material-symbols-outlined gct-arrow">chevron_right</span>
+      </button>
+
+      <div class="modal-divider-label">
+        <span>OR START DIRECT CHAT</span>
+      </div>
+
       <div class="fg">
         <label>Find user by Email</label>
         <div class="iw">
@@ -755,6 +783,125 @@
         </div>
       </div>
       <div id="find-result"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE NEW GROUP MODAL -->
+<div class="modal-ov hidden" id="new-group-modal" onclick="maybeCloseModal(event,'new-group-modal')">
+  <div class="modal" style="max-width: 440px;">
+    <div class="modal-head">
+      <h3>Create New Group</h3>
+      <button onclick="closeModal('new-group-modal')" title="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label>Group Name</label>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">groups</span>
+          <input type="text" id="new-group-name" placeholder="e.g. Design Team 🎨, Weekend Trip" maxlength="40" />
+        </div>
+      </div>
+
+      <div class="fg">
+        <label>Group Topic / Description (Optional)</label>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">notes</span>
+          <input type="text" id="new-group-desc" placeholder="What is this group about?" maxlength="120" />
+        </div>
+      </div>
+
+      <div class="fg">
+        <label>Add Member by Email</label>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">person_add</span>
+          <input type="email" id="new-group-search-email" placeholder="colleague@example.com" oninput="searchGroupMemberCandidate(this.value)" />
+        </div>
+        <div id="new-group-search-result"></div>
+      </div>
+
+      <!-- Selected Members -->
+      <div class="group-selected-section">
+        <label class="group-field-label">Selected Members (<span id="new-group-member-count">1</span>)</label>
+        <div class="group-member-chips" id="new-group-selected-chips">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Quick Contacts Picker -->
+      <div class="group-quick-pick-section">
+        <label class="group-field-label">Recent Contacts</label>
+        <div class="group-contacts-list" id="new-group-recent-contacts">
+          <!-- Dynamically populated from allConvs -->
+        </div>
+      </div>
+
+      <div class="modal-actions-row">
+        <button type="button" class="btn-secondary" onclick="closeModal('new-group-modal')">Cancel</button>
+        <button type="button" class="btn-primary" id="btn-submit-create-group" onclick="createGroupChat()">
+          <span class="material-symbols-outlined">check</span>
+          <span>Create Group</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP INFO MODAL -->
+<div class="modal-ov hidden" id="group-info-modal" onclick="maybeCloseModal(event,'group-info-modal')">
+  <div class="modal" style="max-width: 460px;">
+    <div class="modal-head">
+      <h3>Group Information</h3>
+      <button onclick="closeModal('group-info-modal')" title="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <!-- Group Info Hero -->
+      <div class="group-info-card">
+        <div class="group-info-av" id="group-info-av">
+          <span class="material-symbols-outlined">groups</span>
+        </div>
+        <div class="group-info-meta">
+          <h3 id="group-info-name">Group Name</h3>
+          <p id="group-info-desc">No description</p>
+          <span class="group-meta-sub" id="group-info-created-sub">Group</span>
+        </div>
+      </div>
+
+      <!-- Add Member Bar -->
+      <div class="group-add-member-section">
+        <label class="group-field-label">Add Member</label>
+        <div class="iw">
+          <span class="material-symbols-outlined iw-icon">person_add</span>
+          <input type="email" id="group-add-member-inp" placeholder="friend@example.com" oninput="searchGroupAddMemberCandidate(this.value)" />
+        </div>
+        <div id="group-add-member-result"></div>
+      </div>
+
+      <!-- Members List -->
+      <div class="group-members-container">
+        <div class="group-members-header">
+          <span id="group-members-label">Members (0)</span>
+        </div>
+        <div class="group-members-scroll" id="group-members-list">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Danger Actions -->
+      <div class="group-bottom-actions">
+        <button type="button" class="btn-secondary danger-btn" onclick="leaveCurrentGroup()">
+          <span class="material-symbols-outlined">logout</span>
+          <span>Leave Group</span>
+        </button>
+        <button type="button" class="btn-danger hidden" id="btn-group-delete-all" onclick="deleteCurrentGroup()">
+          <span class="material-symbols-outlined">delete_forever</span>
+          <span>Delete Group for Everyone</span>
+        </button>
+      </div>
     </div>
   </div>
 </div>
