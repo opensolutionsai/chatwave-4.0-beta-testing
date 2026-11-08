@@ -829,6 +829,9 @@ async function loadMyProfile() {
 
   const pfAv = document.getElementById("pf-av");
   if (pfAv) pfAv.innerHTML = d.photoURL ? `<img src="${esc(d.photoURL)}"/>` : esc(initials(d.name));
+  const removePfBtn = document.getElementById("btn-remove-pf-av");
+  if (removePfBtn) removePfBtn.classList.toggle("hidden", !d.photoURL);
+
   const pfName = document.getElementById("pf-name");
   if (pfName) pfName.value = d.name || "";
   const pfStatus = document.getElementById("pf-status");
@@ -871,52 +874,38 @@ window.saveProfile = async () => {
   }
 };
 
-window.uploadAv = async (e) => {
+window.uploadAv = (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  e.target.value = "";
+  openCropModal(file, "account");
+};
 
-  // Let the user know the upload is starting
-  toast("Uploading profile photo...", "info");
-
+window.removeProfilePhoto = async () => {
+  if (!confirm("Remove your profile photo and revert to initials?")) return;
   try {
-    // 1. Prepare the image for Cloudinary
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("upload_preset", "chatwave-ultra-profile"); // 👈 Your preset
-
-    // 2. Upload to your existing Cloudinary cloud (dogwrel9i)
-    const res = await fetch("https://api.cloudinary.com/v1_1/dogwrel9i/image/upload", {
-      method: "POST",
-      body: fd
-    });
-    
-    if (!res.ok) throw new Error(`Cloudinary Error: ${res.status}`);
-    const json = await res.json();
-    const secure_url = json.secure_url; // The clean image link
-
-    // 3. Save the clean URL to Firestore
-    await updateDoc(doc(db, "users", currentUser.uid), { photoURL: secure_url });
-    
-    // Update local cache
+    toast("Removing photo...", "info");
+    await updateDoc(doc(db, "users", currentUser.uid), { photoURL: "" });
     const existingCache = usersCache.get(currentUser.uid) || {};
-    usersCache.set(currentUser.uid, { ...existingCache, photoURL: secure_url });
-    
-    // 4. Update Firebase Auth Profile memory
-    await updateProfile(currentUser, { photoURL: secure_url });
+    usersCache.set(currentUser.uid, { ...existingCache, photoURL: "" });
+    await updateProfile(currentUser, { photoURL: "" });
 
-    // 5. Update the UI instantly
+    const name = currentUser.displayName || "You";
     const pfAv = document.getElementById("pf-av");
-    if (pfAv) pfAv.innerHTML = `<img src="${esc(secure_url)}"/>`;
-    avatarEl(document.getElementById("my-av"), "", secure_url);
+    if (pfAv) pfAv.innerHTML = esc(initials(name));
+    avatarEl(document.getElementById("my-av"), name, "");
     const railAv = document.getElementById("rail-my-av");
-    if (railAv) avatarEl(railAv, "", secure_url);
+    if (railAv) avatarEl(railAv, name, "");
     const sbAv = document.getElementById("settings-sb-av");
-    if (sbAv) avatarEl(sbAv, "", secure_url);
-    
-    toast("Profile photo updated successfully! ✓", "ok");
+    if (sbAv) avatarEl(sbAv, name, "");
+
+    const removeBtn = document.getElementById("btn-remove-pf-av");
+    if (removeBtn) removeBtn.classList.add("hidden");
+
+    toast("Profile photo removed ✓", "ok");
   } catch (err) {
-    console.error("Avatar Upload Error:", err);
-    toast("Failed to upload photo: " + err.message, "err");
+    console.error("removeProfilePhoto error:", err);
+    toast("Failed to remove photo: " + err.message, "err");
   }
 };
 
@@ -1098,8 +1087,12 @@ function renderConvItemSync(conv, peerId, peer, container) {
   if (isGroup) {
     const memberCount = (conv.participants || []).length;
     const subText = conv.groupDesc || `${memberCount} members`;
+    const photo = conv.groupPhotoURL || peer.photoURL;
+    const avContent = photo
+      ? `<img src="${esc(photo)}"/>`
+      : `<span class="material-symbols-outlined group-glyph">groups</span>`;
     item.innerHTML = `
-      <div class="av group-av"><span class="material-symbols-outlined group-glyph">groups</span></div>
+      <div class="av ${photo ? '' : 'group-av'}">${avContent}</div>
       <div class="conv-meta">
         <div class="conv-name">${esc(conv.groupName || peer.name)}</div>
         <div class="conv-last">${esc(subText)}</div>
@@ -1367,8 +1360,14 @@ window.openChat = async (convId, peerId, peer, convObj) => {
 
     const peerAv = document.getElementById("peer-av");
     if (peerAv) {
-      peerAv.className = "av group-av";
-      peerAv.innerHTML = `<span class="material-symbols-outlined group-glyph">groups</span>`;
+      const gPhoto = convData?.groupPhotoURL || currentPeer?.photoURL;
+      if (gPhoto) {
+        peerAv.className = "av";
+        peerAv.innerHTML = `<img src="${esc(gPhoto)}"/>`;
+      } else {
+        peerAv.className = "av group-av";
+        peerAv.innerHTML = `<span class="material-symbols-outlined group-glyph">groups</span>`;
+      }
     }
   } else {
     currentPeer = { id: peerId, ...peer, isGroup: false };
@@ -3563,6 +3562,12 @@ window.openNewGroupModal = () => {
   if (searchInp) searchInp.value = "";
   if (searchRes) searchRes.innerHTML = "";
 
+  newGroupPhotoURL = "";
+  const avPrev = document.getElementById("new-group-av-preview");
+  if (avPrev) avPrev.innerHTML = `<span class="material-symbols-outlined">groups</span>`;
+  const removeLink = document.getElementById("btn-remove-new-group-av");
+  if (removeLink) removeLink.classList.add("hidden");
+
   newGroupSelectedMembers.clear();
   newGroupSelectedMembers.set(currentUser.uid, {
     uid: currentUser.uid,
@@ -3575,6 +3580,22 @@ window.openNewGroupModal = () => {
   populateRecentContactsForGroup();
   openModal('new-group-modal');
   setTimeout(() => nameInp?.focus(), 150);
+};
+
+window.handleNewGroupAvSelect = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = "";
+  openCropModal(file, "newGroup");
+};
+
+window.removeNewGroupAv = (e) => {
+  if (e) e.stopPropagation();
+  newGroupPhotoURL = "";
+  const avPrev = document.getElementById("new-group-av-preview");
+  if (avPrev) avPrev.innerHTML = `<span class="material-symbols-outlined">groups</span>`;
+  const removeLink = document.getElementById("btn-remove-new-group-av");
+  if (removeLink) removeLink.classList.add("hidden");
 };
 
 let searchGroupCandidateTimer = null;
@@ -3670,6 +3691,7 @@ window.createGroupChat = async () => {
       isGroup: true,
       groupName: name,
       groupDesc: desc,
+      groupPhotoURL: newGroupPhotoURL || "",
       createdBy: currentUser.uid,
       admins: [currentUser.uid],
       participants: participantIds,
@@ -3692,7 +3714,7 @@ window.createGroupChat = async () => {
     closeModal("new-group-modal");
     toast(`Group "${name}" created!`, "ok");
 
-    openChat(docRef.id, null, { name: name, isGroup: true, photoURL: "" }, {
+    openChat(docRef.id, null, { name: name, isGroup: true, photoURL: newGroupPhotoURL || "" }, {
       id: docRef.id,
       ...newGroupDoc
     });
@@ -3728,6 +3750,9 @@ window.openGroupInfoModal = async () => {
   const addInp = document.getElementById("group-add-member-inp");
   const addRes = document.getElementById("group-add-member-result");
   const btnDeleteAll = document.getElementById("btn-group-delete-all");
+  const groupInfoAv = document.getElementById("group-info-av");
+  const btnEditGroupAv = document.getElementById("btn-edit-group-av");
+  const btnRemoveGroupAv = document.getElementById("btn-remove-existing-group-av");
 
   if (nameEl) nameEl.textContent = currentConv.groupName || "Group";
   if (descEl) descEl.textContent = currentConv.groupDesc || "No description provided.";
@@ -3740,6 +3765,22 @@ window.openGroupInfoModal = async () => {
   const participants = currentConv.participants || [];
   const admins = currentConv.admins || [creatorUid];
   const amIAdmin = admins.includes(currentUser.uid) || creatorUid === currentUser.uid;
+
+  if (groupInfoAv) {
+    if (currentConv.groupPhotoURL) {
+      groupInfoAv.innerHTML = `<img src="${esc(currentConv.groupPhotoURL)}"/>`;
+    } else {
+      groupInfoAv.innerHTML = `<span class="material-symbols-outlined">groups</span>`;
+    }
+  }
+
+  if (btnEditGroupAv) {
+    btnEditGroupAv.classList.toggle("hidden", !amIAdmin);
+  }
+
+  if (btnRemoveGroupAv) {
+    btnRemoveGroupAv.classList.toggle("hidden", !amIAdmin || !currentConv.groupPhotoURL);
+  }
 
   if (btnDeleteAll) {
     btnDeleteAll.classList.toggle("hidden", !amIAdmin);
@@ -3949,3 +3990,399 @@ window.deleteCurrentGroup = async () => {
     toast("Failed to delete group: " + err.message, "err");
   }
 };
+
+// ═══════════════════════════════════════════════════════
+// ── AVATAR CROPPING & COMPRESSION SYSTEM (CLOUDINARY) ──
+// ═══════════════════════════════════════════════════════
+
+window.handleGroupInfoAvSelect = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = "";
+  openCropModal(file, "existingGroup");
+};
+
+window.removeExistingGroupAv = async () => {
+  if (!currentConvId || !currentConv) return;
+  const isAdmin = (currentConv.admins || []).includes(currentUser.uid) || currentConv.createdBy === currentUser.uid;
+  if (!isAdmin) {
+    toast("Only admins can change the group icon.", "err");
+    return;
+  }
+  if (!confirm("Remove group icon and revert to default?")) return;
+  try {
+    toast("Removing group icon...", "info");
+    await updateDoc(doc(db, "conversations", currentConvId), {
+      groupPhotoURL: ""
+    });
+    await addDoc(collection(db, "conversations", currentConvId, "messages"), {
+      type: "system",
+      text: `${currentUser.displayName || "Admin"} removed the group icon`,
+      senderId: currentUser.uid,
+      createdAt: serverTimestamp()
+    });
+    currentConv.groupPhotoURL = "";
+    const groupInfoAv = document.getElementById("group-info-av");
+    if (groupInfoAv) groupInfoAv.innerHTML = `<span class="material-symbols-outlined">groups</span>`;
+    const btnRemove = document.getElementById("btn-remove-existing-group-av");
+    if (btnRemove) btnRemove.classList.add("hidden");
+    const peerAv = document.getElementById("peer-av");
+    if (peerAv) {
+      peerAv.className = "av group-av";
+      peerAv.innerHTML = `<span class="material-symbols-outlined group-glyph">groups</span>`;
+    }
+    toast("Group icon removed ✓", "ok");
+  } catch (err) {
+    console.error("removeExistingGroupAv error:", err);
+    toast("Failed: " + err.message, "err");
+  }
+};
+
+const cropperState = {
+  img: null,
+  canvas: null,
+  ctx: null,
+  viewportSize: 280,
+  cropRadius: 110, // 220px diameter circular cutout
+  scale: 1,
+  minScale: 1,
+  maxScale: 4,
+  posX: 0,
+  posY: 0,
+  rotation: 0,
+  isDragging: false,
+  dragStartX: 0,
+  dragStartY: 0,
+  targetMode: null // 'account' | 'newGroup' | 'existingGroup'
+};
+
+let cropperEventsAttached = false;
+
+window.openCropModal = (file, mode) => {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    toast("Please select an image file (PNG, JPG, WebP)", "err");
+    return;
+  }
+  cropperState.targetMode = mode;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      cropperState.img = img;
+      initCropperCanvas();
+      openModal("image-crop-modal");
+    };
+    img.onerror = () => {
+      toast("Failed to load selected image", "err");
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+window.closeCropModal = () => {
+  closeModal("image-crop-modal");
+  cropperState.img = null;
+  cropperState.isDragging = false;
+};
+
+function initCropperCanvas() {
+  const canvas = document.getElementById("crop-canvas");
+  if (!canvas) return;
+  cropperState.canvas = canvas;
+  cropperState.ctx = canvas.getContext("2d");
+
+  const vp = cropperState.viewportSize;
+  canvas.width = vp;
+  canvas.height = vp;
+
+  const img = cropperState.img;
+  cropperState.rotation = 0;
+
+  const cropDiameter = cropperState.cropRadius * 2;
+  const scaleX = cropDiameter / img.naturalWidth;
+  const scaleY = cropDiameter / img.naturalHeight;
+  const baseScale = Math.max(scaleX, scaleY);
+
+  cropperState.minScale = baseScale;
+  cropperState.maxScale = baseScale * 4;
+  cropperState.scale = baseScale;
+
+  cropperState.posX = vp / 2;
+  cropperState.posY = vp / 2;
+
+  const zoomSlider = document.getElementById("crop-zoom-slider");
+  if (zoomSlider) {
+    zoomSlider.min = cropperState.minScale;
+    zoomSlider.max = cropperState.maxScale;
+    zoomSlider.step = (cropperState.maxScale - cropperState.minScale) / 100;
+    zoomSlider.value = cropperState.scale;
+  }
+
+  setupCropperEvents();
+  drawCropper();
+}
+
+function setupCropperEvents() {
+  const canvas = cropperState.canvas;
+  if (!canvas || cropperEventsAttached) return;
+  cropperEventsAttached = true;
+
+  const getPos = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+  };
+
+  const startDrag = (e) => {
+    e.preventDefault();
+    cropperState.isDragging = true;
+    const p = getPos(e);
+    cropperState.dragStartX = p.x - cropperState.posX;
+    cropperState.dragStartY = p.y - cropperState.posY;
+  };
+
+  const moveDrag = (e) => {
+    if (!cropperState.isDragging) return;
+    e.preventDefault();
+    const p = getPos(e);
+    cropperState.posX = p.x - cropperState.dragStartX;
+    cropperState.posY = p.y - cropperState.dragStartY;
+    drawCropper();
+  };
+
+  const stopDrag = () => {
+    cropperState.isDragging = false;
+  };
+
+  canvas.addEventListener("mousedown", startDrag);
+  window.addEventListener("mousemove", moveDrag);
+  window.addEventListener("mouseup", stopDrag);
+
+  canvas.addEventListener("touchstart", startDrag, { passive: false });
+  window.addEventListener("touchmove", moveDrag, { passive: false });
+  window.addEventListener("touchend", stopDrag);
+
+  // Wheel zoom
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.08 : -0.08;
+    const newScale = Math.min(cropperState.maxScale, Math.max(cropperState.minScale, cropperState.scale + delta * cropperState.minScale));
+    cropperState.scale = newScale;
+    const zoomSlider = document.getElementById("crop-zoom-slider");
+    if (zoomSlider) zoomSlider.value = newScale;
+    drawCropper();
+  }, { passive: false });
+}
+
+function drawCropper() {
+  const { canvas, ctx, img, viewportSize, cropRadius, posX, posY, scale, rotation } = cropperState;
+  if (!canvas || !ctx || !img) return;
+
+  ctx.clearRect(0, 0, viewportSize, viewportSize);
+
+  // 1. Draw image with scale, position, rotation
+  ctx.save();
+  ctx.translate(posX, posY);
+  ctx.rotate((rotation * Math.PI) / 180);
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+  ctx.restore();
+
+  // 2. Draw dark vignette mask with circular cutout
+  const cx = viewportSize / 2;
+  const cy = viewportSize / 2;
+  const r = cropRadius;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(7, 10, 19, 0.78)";
+  ctx.beginPath();
+  ctx.rect(0, 0, viewportSize, viewportSize);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+  ctx.fill();
+
+  // 3. Draw circular border guide
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "#6366f1"; // Primary indigo accent
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 4. Subtle grid lines inside circle
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.94, cy - r / 3); ctx.lineTo(cx + r * 0.94, cy - r / 3);
+  ctx.moveTo(cx - r * 0.94, cy + r / 3); ctx.lineTo(cx + r * 0.94, cy + r / 3);
+  ctx.moveTo(cx - r / 3, cy - r * 0.94); ctx.lineTo(cx - r / 3, cy + r * 0.94);
+  ctx.moveTo(cx + r / 3, cy - r * 0.94); ctx.lineTo(cx + r / 3, cy + r * 0.94);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+window.handleCropZoom = (val) => {
+  cropperState.scale = parseFloat(val);
+  drawCropper();
+};
+
+window.handleCropRotate = () => {
+  cropperState.rotation = (cropperState.rotation + 90) % 360;
+  drawCropper();
+};
+
+window.handleCropReset = () => {
+  cropperState.rotation = 0;
+  cropperState.scale = cropperState.minScale;
+  cropperState.posX = cropperState.viewportSize / 2;
+  cropperState.posY = cropperState.viewportSize / 2;
+  const zoomSlider = document.getElementById("crop-zoom-slider");
+  if (zoomSlider) zoomSlider.value = cropperState.minScale;
+  drawCropper();
+};
+
+window.applyAndUploadCrop = async () => {
+  const btn = document.getElementById("btn-save-cropped-image");
+  const prevHtml = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spin" style="width:16px;height:16px;border-width:2px;display:inline-block;margin-right:6px;"></div>Saving...`;
+  }
+
+  try {
+    const { img, viewportSize, cropRadius, posX, posY, scale, rotation, targetMode } = cropperState;
+    if (!img) return;
+
+    // Render cropped 1:1 square onto offscreen canvas (512x512)
+    const exportDim = 512;
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = exportDim;
+    exportCanvas.height = exportDim;
+    const exportCtx = exportCanvas.getContext("2d");
+    exportCtx.imageSmoothingEnabled = true;
+    exportCtx.imageSmoothingQuality = "high";
+
+    const cropDiameter = cropRadius * 2;
+    const exportRatio = exportDim / cropDiameter;
+    const cx = viewportSize / 2;
+    const cy = viewportSize / 2;
+
+    exportCtx.translate(exportDim / 2, exportDim / 2);
+    exportCtx.scale(exportRatio, exportRatio);
+    exportCtx.translate(posX - cx, posY - cy);
+    exportCtx.rotate((rotation * Math.PI) / 180);
+    exportCtx.scale(scale, scale);
+    exportCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+
+    // Convert to compressed WebP blob (quality: 0.85) - drops size to ~30KB
+    const blob = await new Promise((resolve) => {
+      exportCanvas.toBlob((b) => {
+        if (b) resolve(b);
+        else exportCanvas.toBlob(resolve, "image/jpeg", 0.85);
+      }, "image/webp", 0.85);
+    });
+
+    if (!blob) throw new Error("Canvas crop export failed");
+
+    // Upload compressed blob to Cloudinary
+    toast("Uploading avatar...", "info");
+    const secureUrl = await uploadAvatarBlobToCloudinary(blob);
+
+    if (targetMode === "account") {
+      // 1. Update Firestore
+      await updateDoc(doc(db, "users", currentUser.uid), { photoURL: secureUrl });
+      // 2. Update memory cache
+      const existingCache = usersCache.get(currentUser.uid) || {};
+      usersCache.set(currentUser.uid, { ...existingCache, photoURL: secureUrl });
+      // 3. Update Auth profile
+      await updateProfile(currentUser, { photoURL: secureUrl });
+      // 4. Update UI
+      const pfAv = document.getElementById("pf-av");
+      if (pfAv) pfAv.innerHTML = `<img src="${esc(secureUrl)}"/>`;
+      avatarEl(document.getElementById("my-av"), "", secureUrl);
+      const railAv = document.getElementById("rail-my-av");
+      if (railAv) avatarEl(railAv, "", secureUrl);
+      const sbAv = document.getElementById("settings-sb-av");
+      if (sbAv) avatarEl(sbAv, "", secureUrl);
+
+      const removeBtn = document.getElementById("btn-remove-pf-av");
+      if (removeBtn) removeBtn.classList.remove("hidden");
+
+      toast("Profile photo updated successfully! ✓", "ok");
+    } else if (targetMode === "newGroup") {
+      newGroupPhotoURL = secureUrl;
+      const avPrev = document.getElementById("new-group-av-preview");
+      if (avPrev) avPrev.innerHTML = `<img src="${esc(secureUrl)}"/>`;
+      const removeLink = document.getElementById("btn-remove-new-group-av");
+      if (removeLink) removeLink.classList.remove("hidden");
+      toast("Group icon ready! ✓", "ok");
+    } else if (targetMode === "existingGroup") {
+      if (!currentConvId) return;
+      await updateDoc(doc(db, "conversations", currentConvId), {
+        groupPhotoURL: secureUrl
+      });
+      await addDoc(collection(db, "conversations", currentConvId, "messages"), {
+        type: "system",
+        text: `${currentUser.displayName || "Admin"} changed the group icon`,
+        senderId: currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+      if (currentConv) currentConv.groupPhotoURL = secureUrl;
+      const groupInfoAv = document.getElementById("group-info-av");
+      if (groupInfoAv) groupInfoAv.innerHTML = `<img src="${esc(secureUrl)}"/>`;
+      const peerAv = document.getElementById("peer-av");
+      if (peerAv) {
+        peerAv.className = "av";
+        peerAv.innerHTML = `<img src="${esc(secureUrl)}"/>`;
+      }
+      const removeLink = document.getElementById("btn-remove-existing-group-av");
+      if (removeLink) removeLink.classList.remove("hidden");
+      toast("Group icon updated! ✓", "ok");
+    }
+
+    closeCropModal();
+  } catch (err) {
+    console.error("Avatar Crop & Upload Error:", err);
+    toast("Failed: " + err.message, "err");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = prevHtml;
+    }
+  }
+};
+
+async function uploadAvatarBlobToCloudinary(blob) {
+  const fd = new FormData();
+  fd.append("file", blob, "avatar.webp");
+  fd.append("upload_preset", "chatwave-ultra-profile");
+
+  let res = await fetch("https://api.cloudinary.com/v1_1/dogwrel9i/image/upload", {
+    method: "POST",
+    body: fd
+  });
+
+  if (!res.ok) {
+    // Fallback to secondary preset if first fails
+    const fdFallback = new FormData();
+    fdFallback.append("file", blob, "avatar.webp");
+    fdFallback.append("upload_preset", "x7a9bc");
+    res = await fetch("https://api.cloudinary.com/v1_1/dogwrel9i/image/upload", {
+      method: "POST",
+      body: fdFallback
+    });
+  }
+
+  if (!res.ok) {
+    throw new Error(`Cloudinary upload failed (${res.status})`);
+  }
+
+  const json = await res.json();
+  return json.secure_url;
+}

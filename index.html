@@ -590,6 +590,10 @@
                 <span class="material-symbols-outlined">photo_camera</span>
                 <span>Change Photo</span>
               </label>
+              <button type="button" class="remove-av-btn hidden" id="btn-remove-pf-av" onclick="removeProfilePhoto()" title="Remove Photo">
+                <span class="material-symbols-outlined">delete</span>
+                <span>Remove</span>
+              </button>
               <input type="file" id="av-input" accept="image/*" class="hidden" onchange="uploadAv(event)"/>
             </div>
             <div class="pf-fields-grid">
@@ -797,6 +801,24 @@
       </button>
     </div>
     <div class="modal-body">
+      <!-- Group Icon / Avatar Picker -->
+      <div class="new-group-av-section">
+        <div class="new-group-av-wrap" onclick="document.getElementById('new-group-av-inp').click()" title="Choose Group Icon">
+          <div class="new-group-av-preview" id="new-group-av-preview">
+            <span class="material-symbols-outlined">groups</span>
+          </div>
+          <div class="new-group-av-badge">
+            <span class="material-symbols-outlined">photo_camera</span>
+          </div>
+        </div>
+        <input type="file" id="new-group-av-inp" accept="image/*" class="hidden" onchange="handleNewGroupAvSelect(event)" />
+        <div class="new-group-av-meta">
+          <span class="av-hint-title">Group Icon</span>
+          <span class="av-hint-sub">Tap icon to choose and crop</span>
+          <button type="button" class="av-remove-link hidden" id="btn-remove-new-group-av" onclick="removeNewGroupAv(event)">Remove Icon</button>
+        </div>
+      </div>
+
       <div class="fg">
         <label>Group Name</label>
         <div class="iw">
@@ -861,13 +883,20 @@
     <div class="modal-body">
       <!-- Group Info Hero -->
       <div class="group-info-card">
-        <div class="group-info-av" id="group-info-av">
-          <span class="material-symbols-outlined">groups</span>
+        <div class="group-info-av-wrap">
+          <div class="group-info-av" id="group-info-av">
+            <span class="material-symbols-outlined">groups</span>
+          </div>
+          <button type="button" class="group-info-av-badge hidden" id="btn-edit-group-av" onclick="document.getElementById('group-info-av-inp').click()" title="Change Group Icon">
+            <span class="material-symbols-outlined">photo_camera</span>
+          </button>
+          <input type="file" id="group-info-av-inp" accept="image/*" class="hidden" onchange="handleGroupInfoAvSelect(event)" />
         </div>
         <div class="group-info-meta">
           <h3 id="group-info-name">Group Name</h3>
           <p id="group-info-desc">No description</p>
           <span class="group-meta-sub" id="group-info-created-sub">Group</span>
+          <button type="button" class="av-remove-link hidden" id="btn-remove-existing-group-av" onclick="removeExistingGroupAv()">Remove Group Icon</button>
         </div>
       </div>
 
@@ -900,6 +929,48 @@
         <button type="button" class="btn-danger hidden" id="btn-group-delete-all" onclick="deleteCurrentGroup()">
           <span class="material-symbols-outlined">delete_forever</span>
           <span>Delete Group for Everyone</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IMAGE CROPPER MODAL -->
+<div class="modal-ov hidden" id="image-crop-modal" onclick="maybeCloseModal(event,'image-crop-modal')">
+  <div class="modal crop-modal">
+    <div class="modal-head">
+      <h3>Crop & Adjust Avatar</h3>
+      <button onclick="closeCropModal()" title="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body crop-modal-body">
+      <div class="crop-viewport-wrapper">
+        <canvas id="crop-canvas" width="280" height="280"></canvas>
+        <div class="crop-viewport-hint">Drag image to position • Scroll or slide to zoom</div>
+      </div>
+
+      <div class="crop-controls-row">
+        <div class="crop-zoom-control">
+          <span class="material-symbols-outlined crop-icon">zoom_out</span>
+          <input type="range" id="crop-zoom-slider" min="1" max="4" step="0.01" value="1" oninput="handleCropZoom(this.value)" />
+          <span class="material-symbols-outlined crop-icon">zoom_in</span>
+        </div>
+        <div class="crop-btn-actions">
+          <button type="button" class="btn-crop-tool" onclick="handleCropRotate()" title="Rotate 90°">
+            <span class="material-symbols-outlined">rotate_right</span>
+          </button>
+          <button type="button" class="btn-crop-tool" onclick="handleCropReset()" title="Reset Position">
+            <span class="material-symbols-outlined">restart_alt</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-actions-row" style="margin-top: 18px; width: 100%;">
+        <button type="button" class="btn-secondary" onclick="closeCropModal()">Cancel</button>
+        <button type="button" class="btn-primary" id="btn-save-cropped-image" onclick="applyAndUploadCrop()">
+          <span class="material-symbols-outlined">check</span>
+          <span>Save & Apply</span>
         </button>
       </div>
     </div>

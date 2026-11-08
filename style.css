@@ -3991,3 +3991,261 @@ a:hover {
     display: grid !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   7. AVATAR CROPPING & ENHANCED AVATAR MANAGEMENT (Obsidian Wave Specification)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Remove Avatar Button in Profile Settings */
+.remove-av-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: #f87171;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+.remove-av-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.remove-av-btn .material-symbols-outlined {
+  font-size: 15px;
+}
+
+/* New Group Avatar Picker in #new-group-modal */
+.new-group-av-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: var(--surface-container);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+.new-group-av-wrap {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.new-group-av-wrap:hover {
+  transform: scale(1.04);
+}
+.new-group-av-preview {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(79, 70, 229, 0.15);
+  border: 2px solid var(--primary);
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  overflow: hidden;
+}
+.new-group-av-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.new-group-av-preview .material-symbols-outlined {
+  font-size: 30px;
+}
+.new-group-av-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--surface-container);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.new-group-av-badge .material-symbols-outlined {
+  font-size: 13px;
+}
+.new-group-av-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.av-hint-title {
+  font-family: var(--font-headline);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--on-surface);
+}
+.av-hint-sub {
+  font-size: 0.74rem;
+  color: var(--on-surface-variant);
+}
+.av-remove-link {
+  background: none;
+  border: none;
+  color: #f87171;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  margin-top: 5px;
+  display: inline-block;
+  transition: color 0.15s;
+}
+.av-remove-link:hover {
+  color: #ef4444;
+  text-decoration: underline;
+}
+
+/* Group Info Avatar Wrap in #group-info-modal */
+.group-info-av-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+.group-info-av {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(79, 70, 229, 0.15);
+  border: 2px solid var(--primary);
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  overflow: hidden;
+}
+.group-info-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.group-info-av-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--surface-container);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s;
+}
+.group-info-av-badge:hover {
+  transform: scale(1.1);
+}
+.group-info-av-badge .material-symbols-outlined {
+  font-size: 14px;
+}
+
+/* Image Cropper Modal */
+.crop-modal {
+  max-width: 360px !important;
+  width: 90vw;
+  border-top: 3px solid var(--primary);
+}
+.crop-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 20px 20px;
+}
+.crop-viewport-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+#crop-canvas {
+  width: 280px;
+  height: 280px;
+  border-radius: var(--radius-md);
+  background: #080b13;
+  cursor: grab;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  display: block;
+}
+#crop-canvas:active {
+  cursor: grabbing;
+}
+.crop-viewport-hint {
+  font-size: 0.72rem;
+  color: var(--outline);
+  margin-top: 8px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+.crop-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  width: 100%;
+  background: var(--surface-container-high);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.crop-zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.crop-zoom-control .crop-icon {
+  font-size: 18px;
+  color: var(--on-surface-variant);
+}
+.crop-zoom-control input[type="range"] {
+  flex: 1;
+  accent-color: var(--primary);
+  cursor: pointer;
+  height: 4px;
+}
+.crop-btn-actions {
+  display: flex;
+  gap: 6px;
+}
+.btn-crop-tool {
+  background: var(--surface-container);
+  border: 1px solid var(--border);
+  color: var(--on-surface);
+  border-radius: var(--radius-sm);
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-crop-tool:hover {
+  background: var(--surface-bright);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.btn-crop-tool .material-symbols-outlined {
+  font-size: 18px;
+}
