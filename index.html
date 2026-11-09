@@ -977,6 +977,42 @@
   </div>
 </div>
 
+<!-- OBSIDIAN WAVE IMAGE LIGHTBOX -->
+<div class="modal-ov hidden lightbox-ov" id="image-lightbox-modal" onclick="maybeCloseModal(event,'image-lightbox-modal')">
+  <div class="lightbox-container" onclick="event.stopPropagation()">
+    <div class="lightbox-topbar">
+      <div class="lightbox-meta">
+        <span class="lightbox-sender" id="lightbox-sender">User</span>
+        <span class="lightbox-time" id="lightbox-time">Today</span>
+      </div>
+      <div class="lightbox-actions">
+        <button class="ib-lightbox" onclick="zoomLightbox(-0.25)" title="Zoom Out">
+          <span class="material-symbols-outlined">zoom_out</span>
+        </button>
+        <span class="lightbox-zoom-val" id="lightbox-zoom-val">100%</span>
+        <button class="ib-lightbox" onclick="zoomLightbox(0.25)" title="Zoom In">
+          <span class="material-symbols-outlined">zoom_in</span>
+        </button>
+        <button class="ib-lightbox" onclick="resetLightboxZoom()" title="Reset Zoom">
+          <span class="material-symbols-outlined">restart_alt</span>
+        </button>
+        <a class="ib-lightbox" id="lightbox-download-btn" href="#" download="chatwave-image.webp" title="Download Image">
+          <span class="material-symbols-outlined">download</span>
+        </a>
+        <a class="ib-lightbox" id="lightbox-external-btn" href="#" target="_blank" rel="noopener noreferrer" title="Open Full in New Tab">
+          <span class="material-symbols-outlined">open_in_new</span>
+        </a>
+        <button class="ib-lightbox close-btn" onclick="closeLightbox()" title="Close (Esc)">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="lightbox-stage" id="lightbox-stage" onclick="closeLightbox()">
+      <img id="lightbox-img" src="" alt="Full view" onclick="event.stopPropagation()" />
+    </div>
+  </div>
+</div>
+
 <!-- START CALL MODAL -->
 <div class="modal-ov hidden" id="start-call-modal" onclick="maybeCloseModal(event,'start-call-modal')">
   <div class="modal">
