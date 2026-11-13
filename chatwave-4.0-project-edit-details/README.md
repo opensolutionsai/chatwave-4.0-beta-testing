@@ -21,5 +21,5 @@ This directory contains in-depth documentation of major architectural decisions,
 3. [Feature #003: End-to-End Encrypted Voice Messaging](./readme-2026-11-13-21-42-end-to-end-encrypted-voice-messaging.md)
    - **File**: `readme-2026-11-13-21-42-end-to-end-encrypted-voice-messaging.md`
    - **Date & Time**: November 13, 2026 at 21:42 IST
-   - **Git Commit**: (Current)
+   - **Git Commit**: `b38ac48`
    - **Topic**: Full client-side AES-GCM encrypted voice notes with WhatsApp-style smooth recording bar, pause-state waveform synchronization, modern player cards, speed controls, seek bars, and Supabase 7-day auto-purge life cycle.
