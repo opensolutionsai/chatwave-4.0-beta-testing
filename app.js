@@ -32,14 +32,31 @@ const db = initializeFirestore(FB, { localCache: persistentLocalCache() });
 const SUPABASE_URL = "https://cejtngzybawccjqlaabq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_JRfPBYe9BFV5VWKno1km5A_kfwoXyDZ";
 
+// ── SYNCHRONOUS FIREBASE TOKEN CACHE FOR SUPABASE CALLS ──
+let cachedFirebaseToken = null;
+let tokenRefreshTimer = null;
+
+async function getFirebaseToken(forceRefresh = false) {
+  if (!auth.currentUser) {
+    cachedFirebaseToken = null;
+    return null;
+  }
+  try {
+    cachedFirebaseToken = await auth.currentUser.getIdToken(forceRefresh);
+    return cachedFirebaseToken;
+  } catch (err) {
+    console.warn("Could not retrieve Firebase ID token:", err);
+    return cachedFirebaseToken;
+  }
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: false,
     autoRefreshToken: false,
   },
   accessToken: async () => {
-    if (!auth.currentUser) return null;
-    return (await auth.currentUser.getIdToken(false)) ?? null;
+    return (await getFirebaseToken(false)) ?? null;
   }
 });
 
@@ -482,14 +499,19 @@ async function reportPresenceDb(isOnline) {
   if (!currentUser) return;
   const nowIso = new Date().toISOString();
   try {
-    await supabase.from("user_presence").upsert({
+    // Ensure fresh token is cached for the upsert
+    await getFirebaseToken(false);
+    const { error } = await supabase.from("user_presence").upsert({
       user_id: currentUser.uid,
       is_online: isOnline,
       last_seen: nowIso,
       updated_at: nowIso
     });
+    if (error) {
+      console.warn("Presence DB update error:", error.message);
+    }
   } catch (err) {
-    console.warn("Presence DB update error:", err);
+    console.warn("Presence DB update exception:", err);
   }
 }
 
@@ -504,24 +526,24 @@ function sendBeaconOffline() {
     updated_at: nowIso
   });
   
+  const headers = {
+    "apikey": SUPABASE_ANON_KEY,
+    "Content-Type": "application/json",
+    "Prefer": "resolution=merge-duplicates"
+  };
+
+  // Attach verified Firebase token so Postgres RLS check passes during unload
+  if (cachedFirebaseToken) {
+    headers["Authorization"] = `Bearer ${cachedFirebaseToken}`;
+  }
+
   try {
     fetch(url, {
       method: "POST",
-      headers: {
-        "apikey": SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates"
-      },
+      headers,
       body: payload,
       keepalive: true
     }).catch(() => {});
-  } catch {}
-
-  try {
-    navigator.sendBeacon?.(
-      url,
-      new Blob([payload], { type: "application/json; charset=UTF-8" })
-    );
   } catch {}
 }
 
@@ -660,7 +682,13 @@ setInterval(() => {
 }, 25000);
 
 window.doLogout = async () => {
+  sendBeaconOffline();
   stopSupabasePresence();
+  if (tokenRefreshTimer) {
+    clearInterval(tokenRefreshTimer);
+    tokenRefreshTimer = null;
+  }
+  cachedFirebaseToken = null;
   await signOut(auth);
 };
 
@@ -673,6 +701,13 @@ const friendlyErr = (err) => {
 onAuthStateChanged(auth, async (user) => {
   if (user && user.emailVerified) {
     currentUser = user;
+    // Populate synchronous Firebase token cache for Supabase RLS
+    await getFirebaseToken(true);
+
+    if (tokenRefreshTimer) clearInterval(tokenRefreshTimer);
+    tokenRefreshTimer = setInterval(() => {
+      getFirebaseToken(true).catch(() => {});
+    }, 45 * 60 * 1000);
     
     // Fetch the user's current Firestore data first to preserve E2EE keys & custom profiles
     const myUserSnap = await getDoc(doc(db, "users", user.uid));
@@ -728,6 +763,11 @@ onAuthStateChanged(auth, async (user) => {
       }
     });
   } else {
+    if (tokenRefreshTimer) {
+      clearInterval(tokenRefreshTimer);
+      tokenRefreshTimer = null;
+    }
+    cachedFirebaseToken = null;
     stopSupabasePresence();
     stopIncomingCallsListener();
     endActiveCallUI();
