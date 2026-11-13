@@ -3616,6 +3616,7 @@ window.toggleCallFullscreen = function() {
 // ── GROUP CHATS MANAGEMENT ──
 // ═══════════════════════════════════════════════════════
 let newGroupSelectedMembers = new Map();
+let newGroupPhotoURL = "";
 
 function populateRecentContactsForGroup() {
   const container = document.getElementById("new-group-recent-contacts");
