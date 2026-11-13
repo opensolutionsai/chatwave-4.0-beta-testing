@@ -500,9 +500,49 @@
           <textarea id="msg-inp" rows="1" placeholder="Type a message…" onkeydown="onKey(event)" oninput="autoResize(this);detectLinkPreview(this.value)" onpaste="onMsgPaste(event)"></textarea>
         </div>
         <div id="link-preview-card" class="link-preview-card hidden"></div>
+        <button class="ib mic-btn" id="btn-voice-record" onclick="toggleVoiceRecord()" title="Record Voice Note">
+          <span class="material-symbols-outlined">mic</span>
+        </button>
         <button class="send-btn" onclick="sendMsg()" title="Send Message">
           <span class="material-symbols-outlined">send</span>
         </button>
+
+        <!-- WhatsApp-Style Full-Width Floating Audio Recording Bar -->
+        <div id="audio-record-bar" class="audio-record-bar hidden">
+          <!-- Cancel / Delete on far left -->
+          <button class="rec-icon-btn rec-cancel-btn" onclick="cancelVoiceRecord()" title="Cancel and Delete">
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+          
+          <!-- Middle status info: live pulsing red dot + timer + audio waveform animation -->
+          <div class="rec-info-wrap">
+            <span class="rec-pulse-dot"></span>
+            <span class="rec-timer" id="rec-timer">0:00</span>
+            <div class="rec-waveform" id="rec-waveform">
+              <span class="rec-bar b1"></span>
+              <span class="rec-bar b2"></span>
+              <span class="rec-bar b3"></span>
+              <span class="rec-bar b4"></span>
+              <span class="rec-bar b5"></span>
+              <span class="rec-bar b6"></span>
+              <span class="rec-bar b7"></span>
+              <span class="rec-bar b8"></span>
+              <span class="rec-bar b9"></span>
+              <span class="rec-bar b10"></span>
+            </div>
+          </div>
+
+          <!-- Preview & Send controls on right -->
+          <div class="rec-right-actions">
+            <audio id="rec-preview-audio" class="hidden"></audio>
+            <button class="rec-icon-btn rec-preview-btn" id="btn-rec-preview" onclick="togglePreviewVoiceRecord()" title="Preview Voice Note">
+              <span class="material-symbols-outlined" id="rec-preview-icon">play_arrow</span>
+            </button>
+            <button class="rec-icon-btn rec-send-btn" onclick="finishAndSendVoiceRecord()" title="Send Voice Note">
+              <span class="material-symbols-outlined">send</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

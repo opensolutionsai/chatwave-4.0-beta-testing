@@ -15,5 +15,11 @@ This directory contains in-depth documentation of major architectural decisions,
 2. [Issue #002: New Group Modal ReferenceError Fix](./readme-2026-11-13-18-53-new-group-modal-reference-error-fix.md)
    - **File**: `readme-2026-11-13-18-53-new-group-modal-reference-error-fix.md`
    - **Date & Time**: November 13, 2026 at 18:53 IST
-   - **Git Commit**: (Current)
+   - **Git Commit**: `7582bac`
    - **Topic**: Fixed critical bug in group creation flow caused by missing `newGroupPhotoURL` declaration in ES module strict mode, unblocking the "+ New Group" modal.
+
+3. [Feature #003: End-to-End Encrypted Voice Messaging](./readme-2026-11-13-21-42-end-to-end-encrypted-voice-messaging.md)
+   - **File**: `readme-2026-11-13-21-42-end-to-end-encrypted-voice-messaging.md`
+   - **Date & Time**: November 13, 2026 at 21:42 IST
+   - **Git Commit**: (Current)
+   - **Topic**: Full client-side AES-GCM encrypted voice notes with WhatsApp-style smooth recording bar, pause-state waveform synchronization, modern player cards, speed controls, seek bars, and Supabase 7-day auto-purge life cycle.

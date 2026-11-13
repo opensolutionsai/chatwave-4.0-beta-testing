@@ -1546,6 +1546,13 @@ function listenMessages(convId) {
           if (msg.image && !msg.image.startsWith("http")) {
             msg.image = await decryptText(msg.image, currentSharedKey);
           }
+          if (msg.audio) {
+            if (typeof msg.audio === "string" && !msg.audio.startsWith("http")) {
+              msg.audio = await decryptText(msg.audio, currentSharedKey);
+            } else if (msg.audio && msg.audio.url && !msg.audio.url.startsWith("http")) {
+              msg.audio.url = await decryptText(msg.audio.url, currentSharedKey);
+            }
+          }
           if (msg.replyTo && msg.replyTo.text) {
             msg.replyTo.text = await decryptText(msg.replyTo.text, currentSharedKey);
           }
@@ -1701,6 +1708,16 @@ function buildMsgEl(msg) {
     imgWrap.appendChild(imgEl);
     imgWrap.appendChild(zoomHint);
     bubble.appendChild(imgWrap);
+  }
+
+  // 2.5 Render E2EE Voice Note securely
+  if (msg.audio) {
+    bubble.classList.add("has-audio");
+    const audioData = typeof msg.audio === "string" 
+      ? { url: msg.audio, duration: 0, isEncryptedBinary: false } 
+      : msg.audio;
+    const voiceCard = buildVoiceMsgEl(audioData, msg, isMe);
+    bubble.appendChild(voiceCard);
   }
   
   // 3. Render Text securely
@@ -1862,12 +1879,12 @@ window.scrollToMsg = (id) => {
 };
 
 // ── SEND MESSAGE ──
-window.sendMsg = async (customText, imgUrl) => {
+window.sendMsg = async (customText, imgUrl, audioData) => {
   const inp = document.getElementById("msg-inp");
   const text = (customText !== undefined && customText !== null) ? customText : inp.value.trim();
-  if (!text && !imgUrl) return;          // must have text OR image
+  if (!text && !imgUrl && !audioData) return;          // must have text OR image OR audio
   if (!currentConvId || !currentPeer) return;
-  if (!imgUrl) { inp.value = ""; autoResize(inp); }
+  if (!imgUrl && !audioData) { inp.value = ""; autoResize(inp); }
   
   const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
   const isE2EE = !isGroup && !!currentSharedKey;
@@ -1877,7 +1894,8 @@ window.sendMsg = async (customText, imgUrl) => {
     senderId: currentUser.uid,
     createdAt: serverTimestamp(),
     encrypted: isE2EE,
-    ...(imgUrl ? { image: imgUrl } : {})
+    ...(imgUrl ? { image: imgUrl } : {}),
+    ...(audioData ? { audio: audioData } : {})
   };
 
   if (isGroup) {
@@ -1920,10 +1938,13 @@ window.sendMsg = async (customText, imgUrl) => {
   await addDoc(collection(db, "conversations", currentConvId, "messages"), msgData);
   if (!imgUrl) clearLinkPreview();
 
+  const lastSnippet = audioData ? "🎙️ Voice note" : (imgUrl ? "📷 Photo" : (text || ""));
+
   if (isGroup) {
     const participants = currentConv?.participants || [];
     const updatePayload = {
       lastAt: serverTimestamp(),
+      lastMessage: lastSnippet,
       [`unread.${currentUser.uid}`]: 0,
       [`hiddenUI.${currentUser.uid}`]: false
     };
@@ -1939,6 +1960,7 @@ window.sendMsg = async (customText, imgUrl) => {
     if (!amIBlocked) {
       await updateDoc(doc(db, "conversations", currentConvId), {
         lastAt: serverTimestamp(),
+        lastMessage: lastSnippet,
         [`unread.${currentPeer.id}`]: increment(1),
         [`unread.${currentUser.uid}`]: 0,
         [`hiddenUI.${currentUser.uid}`]: false,
@@ -2082,6 +2104,497 @@ window.uploadChatImg = async (e) => {
     toast("Image upload failed: " + err.message, "err");
   }
 };
+
+// ══════════════════════════════════════════════════════════════
+// ── OBSIDIAN WAVE END-TO-END ENCRYPTED VOICE MESSAGING ──
+// ══════════════════════════════════════════════════════════════
+let mediaRecorder = null;
+let audioChunks = [];
+let voiceRecordTimer = null;
+let voiceRecordSeconds = 0;
+let recordedAudioBlob = null;
+let isRecording = false;
+let audioStream = null;
+
+const voiceBlobCache = new Map();
+let currentActiveAudio = null;
+let currentActivePlayBtn = null;
+
+function fmtAudioTime(seconds) {
+  const n = Number(seconds);
+  if (!isFinite(n) || n < 0) return "0:00";
+  const s = Math.round(n);
+  const mins = Math.floor(s / 60);
+  const secs = s % 60;
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+async function encryptAudioBlob(blob, sharedKey) {
+  const arrayBuffer = await blob.arrayBuffer();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertextBuffer = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv },
+    sharedKey,
+    arrayBuffer
+  );
+  return new Blob([iv, ciphertextBuffer], { type: "application/octet-stream" });
+}
+
+window.toggleVoiceRecord = async () => {
+  if (isRecording) {
+    await window.finishAndSendVoiceRecord();
+    return;
+  }
+  
+  if (!currentConvId || !currentPeer) {
+    toast("Select a chat first to send a voice note", "info");
+    return;
+  }
+
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    console.error("Mic access denied:", err);
+    toast("Microphone access denied. Please allow mic permissions in your browser.", "err");
+    return;
+  }
+
+  audioChunks = [];
+  voiceRecordSeconds = 0;
+  recordedAudioBlob = null;
+
+  let mimeType = "audio/webm;codecs=opus";
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    mimeType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus") 
+      ? "audio/ogg;codecs=opus" 
+      : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+  }
+
+  try {
+    mediaRecorder = mimeType ? new MediaRecorder(audioStream, { mimeType }) : new MediaRecorder(audioStream);
+  } catch {
+    mediaRecorder = new MediaRecorder(audioStream);
+  }
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) {
+      audioChunks.push(e.data);
+    }
+  };
+
+  mediaRecorder.onstop = () => {
+    const finalType = mediaRecorder.mimeType || "audio/webm";
+    recordedAudioBlob = new Blob(audioChunks, { type: finalType });
+    if (audioStream) {
+      audioStream.getTracks().forEach(t => t.stop());
+      audioStream = null;
+    }
+  };
+
+  mediaRecorder.start(200);
+  isRecording = true;
+
+  const bar = document.getElementById("audio-record-bar");
+  if (bar) {
+    bar.classList.remove("hidden");
+    bar.classList.remove("is-paused");
+  }
+
+  const timerEl = document.getElementById("rec-timer");
+  if (timerEl) timerEl.textContent = "0:00";
+
+  const prevIcon = document.getElementById("rec-preview-icon");
+  if (prevIcon) prevIcon.textContent = "play_arrow";
+
+  const prevAudio = document.getElementById("rec-preview-audio");
+  if (prevAudio) { prevAudio.pause(); prevAudio.src = ""; }
+
+  clearInterval(voiceRecordTimer);
+  voiceRecordTimer = setInterval(() => {
+    voiceRecordSeconds++;
+    if (timerEl) timerEl.textContent = fmtAudioTime(voiceRecordSeconds);
+    if (voiceRecordSeconds >= 300) {
+      window.finishAndSendVoiceRecord();
+    }
+  }, 1000);
+};
+
+window.cancelVoiceRecord = () => {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    try { mediaRecorder.stop(); } catch {}
+  }
+  if (audioStream) {
+    audioStream.getTracks().forEach(t => t.stop());
+    audioStream = null;
+  }
+  clearInterval(voiceRecordTimer);
+  isRecording = false;
+  audioChunks = [];
+  recordedAudioBlob = null;
+  voiceRecordSeconds = 0;
+
+  const bar = document.getElementById("audio-record-bar");
+  if (bar) {
+    bar.classList.add("hidden");
+    bar.classList.remove("is-paused");
+  }
+
+  const prevAudio = document.getElementById("rec-preview-audio");
+  if (prevAudio) { prevAudio.pause(); prevAudio.src = ""; }
+};
+
+window.togglePreviewVoiceRecord = () => {
+  const prevAudio = document.getElementById("rec-preview-audio");
+  const prevIcon = document.getElementById("rec-preview-icon");
+  const bar = document.getElementById("audio-record-bar");
+  if (!prevAudio) return;
+
+  if (isRecording && mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    isRecording = false;
+    clearInterval(voiceRecordTimer);
+  }
+
+  // Freeze the waveform animation while preview is paused/stopped
+  if (bar) bar.classList.add("is-paused");
+
+  setTimeout(() => {
+    if (!recordedAudioBlob && audioChunks.length > 0) {
+      recordedAudioBlob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || "audio/webm" });
+    }
+    if (!recordedAudioBlob) return;
+
+    if (!prevAudio.src || prevAudio.paused) {
+      if (!prevAudio.src) prevAudio.src = URL.createObjectURL(recordedAudioBlob);
+      prevAudio.play().then(() => {
+        if (prevIcon) prevIcon.textContent = "pause";
+        if (bar) bar.classList.remove("is-paused"); // animate while playing preview
+      }).catch(console.warn);
+      prevAudio.onended = () => {
+        if (prevIcon) prevIcon.textContent = "play_arrow";
+        if (bar) bar.classList.add("is-paused");
+      };
+    } else {
+      prevAudio.pause();
+      if (prevIcon) prevIcon.textContent = "play_arrow";
+      if (bar) bar.classList.add("is-paused");
+    }
+  }, 150);
+};
+
+window.finishAndSendVoiceRecord = async () => {
+  const duration = voiceRecordSeconds;
+  if (isRecording && mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    isRecording = false;
+    clearInterval(voiceRecordTimer);
+  }
+
+  const bar = document.getElementById("audio-record-bar");
+  if (bar) {
+    bar.classList.add("hidden");
+    bar.classList.remove("is-paused");
+  }
+
+  const prevAudio = document.getElementById("rec-preview-audio");
+  if (prevAudio) { prevAudio.pause(); prevAudio.src = ""; }
+
+  // Brief pause to allow onstop to finish assembling chunks
+  await new Promise(r => setTimeout(r, 200));
+
+  if (!recordedAudioBlob && audioChunks.length > 0) {
+    recordedAudioBlob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || "audio/webm" });
+  }
+
+  if (!recordedAudioBlob || duration < 1) {
+    toast("Hold or speak longer to send a voice note", "info");
+    audioChunks = [];
+    recordedAudioBlob = null;
+    return;
+  }
+
+  const finalBlob = recordedAudioBlob;
+  const finalDuration = duration;
+  audioChunks = [];
+  recordedAudioBlob = null;
+  voiceRecordSeconds = 0;
+
+  const isGroup = !!(currentConv?.isGroup || currentPeer?.isGroup);
+  const isE2EE = !isGroup && !!currentSharedKey;
+
+  const indicator = document.createElement("div");
+  indicator.className = "upload-indicator";
+  indicator.innerHTML = `<div class="spin"></div><span>Encrypting & uploading voice note…</span>`;
+  document.getElementById("msgs-inner")?.appendChild(indicator);
+
+  try {
+    let uploadBlob = finalBlob;
+    let fileExt = "webm";
+
+    if (isE2EE) {
+      // Scramble into binary ciphertext before uploading
+      uploadBlob = await encryptAudioBlob(finalBlob, currentSharedKey);
+      fileExt = "bin";
+    }
+
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+    const filePath = `${currentConvId}/${currentUser.uid}_${fileName}`;
+
+    await getFirebaseToken(false);
+
+    const { data, error } = await supabase.storage
+      .from("chat-audio")
+      .upload(filePath, uploadBlob, {
+        contentType: isE2EE ? "application/octet-stream" : (finalBlob.type || "audio/webm"),
+        cacheControl: "604800",
+        upsert: false
+      });
+
+    if (error) {
+      throw new Error(`Supabase Audio Storage failed: ${error.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("chat-audio")
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData?.publicUrl;
+    if (!publicUrl) throw new Error("Could not retrieve public URL for audio");
+
+    indicator.remove();
+
+    let finalUrl = publicUrl;
+    if (isE2EE) {
+      finalUrl = await encryptText(publicUrl, currentSharedKey);
+    }
+
+    const audioPayload = {
+      url: finalUrl,
+      duration: finalDuration,
+      isEncryptedBinary: isE2EE
+    };
+
+    await sendMsg(null, null, audioPayload);
+    toast(`Voice note sent (${fmtAudioTime(finalDuration)}) ✓`, "ok");
+  } catch (err) {
+    indicator.remove();
+    console.error("Voice note upload failed:", err);
+    toast("Voice note upload failed: " + err.message, "err");
+  }
+};
+
+function buildVoiceMsgEl(audioData, msg, isMe) {
+  const createdMs = msg.createdAt?.toMillis?.() || (typeof msg.createdAt === 'number' ? msg.createdAt : Date.now());
+  const isExpired = (Date.now() - createdMs) > (7 * 24 * 60 * 60 * 1000);
+
+  const container = document.createElement("div");
+  container.className = "voice-msg-player";
+
+  if (isExpired) {
+    container.innerHTML = `
+      <div class="voice-msg-expired">
+        <span class="material-symbols-outlined">timer_off</span>
+        <span>Voice note expired (7-day privacy limit)</span>
+      </div>
+    `;
+    return container;
+  }
+
+  const playBtn = document.createElement("button");
+  playBtn.className = "voice-play-btn";
+  playBtn.type = "button";
+  playBtn.title = "Play Voice Note";
+  playBtn.innerHTML = `<span class="material-symbols-outlined">play_arrow</span>`;
+
+  const trackWrap = document.createElement("div");
+  trackWrap.className = "voice-track-wrap";
+
+  // Visual audio waveform mini bars inside the player
+  const playerWaveform = document.createElement("div");
+  playerWaveform.className = "voice-player-waveform";
+  playerWaveform.innerHTML = `
+    <span class="v-bar vb1"></span>
+    <span class="v-bar vb2"></span>
+    <span class="v-bar vb3"></span>
+    <span class="v-bar vb4"></span>
+    <span class="v-bar vb5"></span>
+    <span class="v-bar vb6"></span>
+    <span class="v-bar vb7"></span>
+    <span class="v-bar vb8"></span>
+  `;
+
+  const seekBar = document.createElement("input");
+  seekBar.type = "range";
+  seekBar.className = "voice-seek-bar";
+  seekBar.min = "0";
+  seekBar.max = "100";
+  seekBar.value = "0";
+
+  const metaRow = document.createElement("div");
+  metaRow.className = "voice-meta-row";
+
+  const timerSpan = document.createElement("span");
+  timerSpan.className = "voice-timer";
+  const totalDurationStr = fmtAudioTime(audioData.duration || 0);
+  timerSpan.textContent = `0:00 / ${totalDurationStr}`;
+
+  const speedPill = document.createElement("button");
+  speedPill.className = "voice-speed-pill";
+  speedPill.type = "button";
+  speedPill.textContent = "1x";
+
+  metaRow.appendChild(timerSpan);
+  metaRow.appendChild(speedPill);
+
+  // Expiration notice banner inside the voice player
+  const expiryNotice = document.createElement("div");
+  expiryNotice.className = "voice-expiry-badge";
+  expiryNotice.title = "This voice note will be automatically purged after 7 days";
+  expiryNotice.innerHTML = `
+    <span class="material-symbols-outlined">auto_delete</span>
+    <span>Auto-deletes in 7 days</span>
+  `;
+
+  trackWrap.appendChild(playerWaveform);
+  trackWrap.appendChild(seekBar);
+  trackWrap.appendChild(metaRow);
+  trackWrap.appendChild(expiryNotice);
+
+  container.appendChild(playBtn);
+  container.appendChild(trackWrap);
+
+  let audioElement = null;
+  let isLoading = false;
+  const speeds = [1, 1.5, 2];
+  let currentSpeedIdx = 0;
+
+  speedPill.onclick = (e) => {
+    e.stopPropagation();
+    currentSpeedIdx = (currentSpeedIdx + 1) % speeds.length;
+    const newSpeed = speeds[currentSpeedIdx];
+    speedPill.textContent = `${newSpeed}x`;
+    if (audioElement) {
+      audioElement.playbackRate = newSpeed;
+    }
+  };
+
+  playBtn.onclick = async (e) => {
+    e.stopPropagation();
+
+    if (audioElement && !audioElement.paused) {
+      audioElement.pause();
+      playBtn.innerHTML = `<span class="material-symbols-outlined">play_arrow</span>`;
+      container.classList.remove("is-playing");
+      return;
+    }
+
+    if (audioElement && audioElement.paused) {
+      if (currentActiveAudio && currentActiveAudio !== audioElement) {
+        currentActiveAudio.pause();
+        if (currentActivePlayBtn) currentActivePlayBtn.innerHTML = `<span class="material-symbols-outlined">play_arrow</span>`;
+        document.querySelectorAll(".voice-msg-player.is-playing").forEach(el => el.classList.remove("is-playing"));
+      }
+      currentActiveAudio = audioElement;
+      currentActivePlayBtn = playBtn;
+      audioElement.play().catch(console.warn);
+      playBtn.innerHTML = `<span class="material-symbols-outlined">pause</span>`;
+      container.classList.add("is-playing");
+      return;
+    }
+
+    if (isLoading) return;
+    isLoading = true;
+    playBtn.innerHTML = `<div class="spin" style="width:16px;height:16px;border-width:2px;"></div>`;
+
+    try {
+      let playableUrl = voiceBlobCache.get(audioData.url);
+
+      if (!playableUrl) {
+        const response = await fetch(audioData.url);
+        if (response.status === 404) {
+          container.innerHTML = `
+            <div class="voice-msg-expired">
+              <span class="material-symbols-outlined">timer_off</span>
+              <span>Voice note expired (7-day privacy limit)</span>
+            </div>
+          `;
+          return;
+        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        if (audioData.isEncryptedBinary) {
+          const fullBuffer = await response.arrayBuffer();
+          if (fullBuffer.byteLength < 16) throw new Error("Invalid encrypted audio payload");
+
+          const iv = new Uint8Array(fullBuffer.slice(0, 12));
+          const ciphertext = fullBuffer.slice(12);
+
+          const decryptedBuffer = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: iv },
+            currentSharedKey,
+            ciphertext
+          );
+
+          const decryptedBlob = new Blob([decryptedBuffer], { type: "audio/webm" });
+          playableUrl = URL.createObjectURL(decryptedBlob);
+        } else {
+          const rawBlob = await response.blob();
+          playableUrl = URL.createObjectURL(rawBlob);
+        }
+
+        voiceBlobCache.set(audioData.url, playableUrl);
+      }
+
+      audioElement = new Audio(playableUrl);
+      audioElement.playbackRate = speeds[currentSpeedIdx];
+
+      audioElement.ontimeupdate = () => {
+        const dur = isFinite(audioElement.duration) ? audioElement.duration : (audioData.duration || 0);
+        if (!dur) return;
+        const percent = (audioElement.currentTime / dur) * 100;
+        seekBar.value = percent;
+        timerSpan.textContent = `${fmtAudioTime(audioElement.currentTime)} / ${fmtAudioTime(dur)}`;
+      };
+
+      seekBar.oninput = () => {
+        const dur = audioElement ? (isFinite(audioElement.duration) ? audioElement.duration : (audioData.duration || 0)) : 0;
+        if (audioElement && dur) {
+          audioElement.currentTime = (seekBar.value / 100) * dur;
+        }
+      };
+
+      audioElement.onended = () => {
+        playBtn.innerHTML = `<span class="material-symbols-outlined">play_arrow</span>`;
+        container.classList.remove("is-playing");
+        seekBar.value = 0;
+        const dur = isFinite(audioElement.duration) ? audioElement.duration : (audioData.duration || 0);
+        timerSpan.textContent = `0:00 / ${fmtAudioTime(dur)}`;
+      };
+
+      if (currentActiveAudio && currentActiveAudio !== audioElement) {
+        currentActiveAudio.pause();
+        if (currentActivePlayBtn) currentActivePlayBtn.innerHTML = `<span class="material-symbols-outlined">play_arrow</span>`;
+        document.querySelectorAll(".voice-msg-player.is-playing").forEach(el => el.classList.remove("is-playing"));
+      }
+
+      currentActiveAudio = audioElement;
+      currentActivePlayBtn = playBtn;
+
+      await audioElement.play();
+      playBtn.innerHTML = `<span class="material-symbols-outlined">pause</span>`;
+      container.classList.add("is-playing");
+    } catch (err) {
+      console.error("Audio playback error:", err);
+      toast("Could not play audio note: " + err.message, "err");
+      playBtn.innerHTML = `<span class="material-symbols-outlined">error</span>`;
+      container.classList.remove("is-playing");
+    } finally {
+      isLoading = false;
+    }
+  };
+
+  return container;
+}
 
 window.onKey = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); } };
 window.autoResize = (el) => { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; };
