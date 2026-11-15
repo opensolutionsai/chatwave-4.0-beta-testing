@@ -27,5 +27,5 @@ This directory contains in-depth documentation of major architectural decisions,
 4. [Bugfix #004: Voice Recording Pause & Resume Support](./readme-2026-11-15-13-12-voice-recording-pause-resume-fix.md)
    - **File**: `readme-2026-11-15-13-12-voice-recording-pause-resume-fix.md`
    - **Date & Time**: November 15, 2026 at 13:12 IST
-   - **Git Commit**: (Current)
+   - **Git Commit**: `e95967e`
    - **Topic**: Enabled non-destructive voice recording pause and resume using native MediaRecorder state methods, UI state synchronization, and chunk assembly across paused sessions.
