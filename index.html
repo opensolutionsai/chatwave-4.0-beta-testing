@@ -532,12 +532,18 @@
             </div>
           </div>
 
-          <!-- Preview & Send controls on right -->
+          <!-- Preview, Pause/Resume & Send controls on right -->
           <div class="rec-right-actions">
             <audio id="rec-preview-audio" class="hidden"></audio>
-            <button class="rec-icon-btn rec-preview-btn" id="btn-rec-preview" onclick="togglePreviewVoiceRecord()" title="Preview Voice Note">
+            <!-- Pause / Resume Recording toggle button -->
+            <button class="rec-icon-btn rec-pause-btn" id="btn-rec-pause" onclick="togglePauseVoiceRecord()" title="Pause recording">
+              <span class="material-symbols-outlined" id="rec-pause-icon">pause</span>
+            </button>
+            <!-- Preview audio playback button -->
+            <button class="rec-icon-btn rec-preview-btn" id="btn-rec-preview" onclick="togglePreviewVoiceRecord()" title="Listen to preview">
               <span class="material-symbols-outlined" id="rec-preview-icon">play_arrow</span>
             </button>
+            <!-- Final Send button -->
             <button class="rec-icon-btn rec-send-btn" onclick="finishAndSendVoiceRecord()" title="Send Voice Note">
               <span class="material-symbols-outlined">send</span>
             </button>

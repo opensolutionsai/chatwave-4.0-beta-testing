@@ -1579,6 +1579,25 @@ a:hover {
   transform: scale(0.94);
 }
 
+.rec-pause-btn {
+  background: var(--surface-container);
+  color: var(--on-surface);
+  border: 1px solid var(--border);
+}
+.rec-pause-btn:hover {
+  background: var(--surface-container-highest);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+.rec-pause-btn:active {
+  transform: scale(0.94);
+}
+.rec-pause-btn.is-paused {
+  background: rgba(244, 63, 94, 0.16);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
 .rec-preview-btn {
   background: var(--surface-container);
   color: var(--on-surface);

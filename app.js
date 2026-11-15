@@ -2114,6 +2114,7 @@ let voiceRecordTimer = null;
 let voiceRecordSeconds = 0;
 let recordedAudioBlob = null;
 let isRecording = false;
+let isRecordingPaused = false;
 let audioStream = null;
 
 const voiceBlobCache = new Map();
@@ -2162,6 +2163,7 @@ window.toggleVoiceRecord = async () => {
   audioChunks = [];
   voiceRecordSeconds = 0;
   recordedAudioBlob = null;
+  isRecordingPaused = false;
 
   let mimeType = "audio/webm;codecs=opus";
   if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -2203,6 +2205,14 @@ window.toggleVoiceRecord = async () => {
   const timerEl = document.getElementById("rec-timer");
   if (timerEl) timerEl.textContent = "0:00";
 
+  const pauseBtn = document.getElementById("btn-rec-pause");
+  const pauseIcon = document.getElementById("rec-pause-icon");
+  if (pauseBtn) {
+    pauseBtn.classList.remove("is-paused");
+    pauseBtn.title = "Pause recording";
+  }
+  if (pauseIcon) pauseIcon.textContent = "pause";
+
   const prevIcon = document.getElementById("rec-preview-icon");
   if (prevIcon) prevIcon.textContent = "play_arrow";
 
@@ -2229,6 +2239,7 @@ window.cancelVoiceRecord = () => {
   }
   clearInterval(voiceRecordTimer);
   isRecording = false;
+  isRecordingPaused = false;
   audioChunks = [];
   recordedAudioBlob = null;
   voiceRecordSeconds = 0;
@@ -2239,8 +2250,79 @@ window.cancelVoiceRecord = () => {
     bar.classList.remove("is-paused");
   }
 
+  const pauseBtn = document.getElementById("btn-rec-pause");
+  const pauseIcon = document.getElementById("rec-pause-icon");
+  if (pauseBtn) {
+    pauseBtn.classList.remove("is-paused");
+    pauseBtn.title = "Pause recording";
+  }
+  if (pauseIcon) pauseIcon.textContent = "pause";
+
   const prevAudio = document.getElementById("rec-preview-audio");
   if (prevAudio) { prevAudio.pause(); prevAudio.src = ""; }
+};
+
+window.togglePauseVoiceRecord = () => {
+  const bar = document.getElementById("audio-record-bar");
+  const pauseBtn = document.getElementById("btn-rec-pause");
+  const pauseIcon = document.getElementById("rec-pause-icon");
+  const prevAudio = document.getElementById("rec-preview-audio");
+  const prevIcon = document.getElementById("rec-preview-icon");
+
+  // If preview was playing, stop it
+  if (prevAudio && !prevAudio.paused) {
+    prevAudio.pause();
+    if (prevIcon) prevIcon.textContent = "play_arrow";
+  }
+
+  // 1. If currently actively recording, pause it
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    try {
+      mediaRecorder.pause();
+    } catch (err) {
+      console.warn("Could not pause mediaRecorder:", err);
+    }
+    isRecordingPaused = true;
+    clearInterval(voiceRecordTimer);
+
+    if (bar) bar.classList.add("is-paused");
+    if (pauseBtn) {
+      pauseBtn.classList.add("is-paused");
+      pauseBtn.title = "Resume recording";
+    }
+    if (pauseIcon) pauseIcon.textContent = "mic"; // show mic icon to resume speaking
+    return;
+  }
+
+  // 2. If paused, resume recording
+  if (mediaRecorder && mediaRecorder.state === "paused") {
+    try {
+      mediaRecorder.resume();
+    } catch (err) {
+      console.warn("Could not resume mediaRecorder:", err);
+    }
+    isRecording = true;
+    isRecordingPaused = false;
+
+    if (bar) bar.classList.remove("is-paused");
+    if (pauseBtn) {
+      pauseBtn.classList.remove("is-paused");
+      pauseBtn.title = "Pause recording";
+    }
+    if (pauseIcon) pauseIcon.textContent = "pause";
+
+    // Resume recording duration timer
+    const timerEl = document.getElementById("rec-timer");
+    clearInterval(voiceRecordTimer);
+    voiceRecordTimer = setInterval(() => {
+      voiceRecordSeconds++;
+      if (timerEl) timerEl.textContent = fmtAudioTime(voiceRecordSeconds);
+      if (voiceRecordSeconds >= 300) {
+        window.finishAndSendVoiceRecord();
+      }
+    }, 1000);
+    return;
+  }
 };
 
 window.togglePreviewVoiceRecord = () => {
@@ -2284,9 +2366,10 @@ window.togglePreviewVoiceRecord = () => {
 
 window.finishAndSendVoiceRecord = async () => {
   const duration = voiceRecordSeconds;
-  if (isRecording && mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
+  if (mediaRecorder && (mediaRecorder.state === "recording" || mediaRecorder.state === "paused")) {
+    try { mediaRecorder.stop(); } catch {}
     isRecording = false;
+    isRecordingPaused = false;
     clearInterval(voiceRecordTimer);
   }
 
@@ -2295,6 +2378,14 @@ window.finishAndSendVoiceRecord = async () => {
     bar.classList.add("hidden");
     bar.classList.remove("is-paused");
   }
+
+  const pauseBtn = document.getElementById("btn-rec-pause");
+  const pauseIcon = document.getElementById("rec-pause-icon");
+  if (pauseBtn) {
+    pauseBtn.classList.remove("is-paused");
+    pauseBtn.title = "Pause recording";
+  }
+  if (pauseIcon) pauseIcon.textContent = "pause";
 
   const prevAudio = document.getElementById("rec-preview-audio");
   if (prevAudio) { prevAudio.pause(); prevAudio.src = ""; }
